@@ -1,0 +1,28 @@
+{
+  "qm": {
+    "tempo": "vamp:qm-vamp-plugins:qm-tempotracker:beats",
+    "beats": "vamp:qm-vamp-plugins:qm-barbeattracker:beats",
+    "bars": "vamp:qm-vamp-plugins:qm-barbeattracker:bars",
+    "onsets": "vamp:qm-vamp-plugins:qm-onsetdetector:onsets"
+  },
+  "chordino": {
+    "simple": "vamp:nnls-chroma:chordino:simplechord"
+  },
+  "melody": {
+    "plugins": [
+      "vamp:ircamcrepe:crepe:pitch",
+      "vamp:crepe-vamp-plugin:crepe:pitch"
+    ],
+    "pyin": {
+      "pitch": "vamp:pyin:pyin:smoothedpitchtrack",
+      "notes": "vamp:pyin:pyin:notes"
+    }
+  },
+  "spectral": {
+    "contrast_mean": "vamp:bbc-vamp-plugins:bbc-spectral-contrast:mean",
+    "contrast_peaks": "vamp:bbc-vamp-plugins:bbc-spectral-contrast:peaks",
+    "contrast_valleys": "vamp:bbc-vamp-plugins:bbc-spectral-contrast:valleys",
+    "flux": "vamp:bbc-vamp-plugins:bbc-spectral-flux:spectral-flux",
+    "energy": "vamp:bbc-vamp-plugins:bbc-energy:rmsenergy"
+  }
+}

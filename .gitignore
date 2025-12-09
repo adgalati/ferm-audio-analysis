@@ -1,0 +1,37 @@
+# Dependencies
+/node_modules
+/.venv
+__pycache__/
+*.pyc
+
+# Environment & Config
+/config/windows.env
+*.local
+
+# Build outputs
+/dist/
+/dist-electron/
+
+# Data & Models
+/models
+/data
+/training/embeddings
+/training/metadata
+
+# Temporary files
+/temp
+/tmp
+*.log
+output.txt
+
+#Generated assets
+/TonalBalance_*.PNG
+/docs/*.md
+
+# IDE & OS
+.cursor/
+.DS_Store
+Thumbs.db
+
+# Test files
+test-loader.js

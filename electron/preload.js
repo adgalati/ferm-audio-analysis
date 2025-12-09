@@ -1,0 +1,62 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+// Expose protected methods that allow the renderer process to use
+// the ipcRenderer without exposing the entire object
+contextBridge.exposeInMainWorld('electronAPI', {
+  // File selection
+  selectFile: (options) => ipcRenderer.invoke('select-audio-file', options),
+
+  // Analysis operations
+  runAnalysis: (options) => ipcRenderer.invoke('run-analysis', options),
+  cancelAnalysis: () => ipcRenderer.invoke('cancel-analysis'),
+
+  // Progress updates
+  onProgress: (callback) => {
+    ipcRenderer.on('analysis-progress', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('analysis-progress');
+  },
+
+  // Auto-watch events
+  onFileDetected: (callback) => {
+    ipcRenderer.on('file-detected', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('file-detected');
+  },
+  startAutoAnalysis: (filePath) => ipcRenderer.invoke('start-auto-analysis', { filePath }),
+
+  // Export operations
+  exportJson: (data) => ipcRenderer.invoke('export-json', data),
+  exportVisualization: (data, filename) => ipcRenderer.invoke('export-visualization', { data, filename }),
+
+  // Configuration check
+  checkConfig: () => ipcRenderer.invoke('check-config'),
+
+  // Genre explainer
+  explainGenre: (payload) => ipcRenderer.invoke('genre-explainer:explain', payload),
+
+  // File reading
+  readAudioAsDataUrl: (filePath) => ipcRenderer.invoke('read-audio-as-dataurl', filePath),
+
+  // MongoDB operations
+  mongodb: (handler, data) => ipcRenderer.invoke(handler, data),
+
+  // App info
+  getVersion: () => ipcRenderer.invoke('get-version'),
+
+  // Settings
+  getWatchPath: () => ipcRenderer.invoke('settings:get-watch-path'),
+  setWatchPath: (watchPath) => ipcRenderer.invoke('settings:set-watch-path', { watchPath }),
+  selectWatchFolder: () => ipcRenderer.invoke('settings:select-folder'),
+
+  // Settings events
+  onWatchPathChanged: (callback) => {
+    ipcRenderer.on('watch-path-changed', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('watch-path-changed');
+  },
+
+  // Training
+  training: (handler, data) => ipcRenderer.invoke(handler, data),
+  onTrainingLog: (callback) => {
+    ipcRenderer.on('training-log', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('training-log');
+  },
+});
