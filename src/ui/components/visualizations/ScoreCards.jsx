@@ -61,9 +61,8 @@ function ScoreCards({ results }) {
               <h4 className="text-sm font-medium text-gray-300 uppercase tracking-wide">Spectral Genre Fit</h4>
             </div>
             <div>
-              <div className="font-bold text-indigo-100 mb-2 leading-tight text-5xl">
-                {spectralScore}
-                <span className="text-2xl text-indigo-200/80 ml-1">/100</span>
+              <div className="font-bold text-indigo-100 mb-2 leading-tight text-3xl">
+                {getSpectralLabel(spectralScore)}
               </div>
               <div className="text-base text-indigo-200/70 font-medium">
                 {activeSpectralGenre ? `${activeSpectralGenre}` : 'Reference'} match
@@ -163,22 +162,31 @@ function ScoreCards({ results }) {
 
 
         {/* Loudness Score Cards */}
-        {isNumber(globalLufs) && (
-          <div className="bg-gradient-to-br from-orange-900/50 to-orange-800/30 rounded-lg p-5 border border-orange-700/50 min-h-[180px] flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="w-6 h-6 text-orange-400" />
-              <h4 className="text-sm font-medium text-gray-300">Loudness</h4>
+        {isNumber(globalLufs) && (() => {
+          const colors = getLoudnessColors(globalLufs);
+          const label = getLoudnessLabel(globalLufs);
+          return (
+            <div className={`bg-gradient-to-br rounded-lg p-5 border min-h-[180px] flex flex-col justify-between ${colors.cardClass}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className={`w-6 h-6 ${colors.iconClass}`} />
+                <h4 className="text-sm font-medium text-gray-300">Loudness</h4>
+              </div>
+              <div>
+                <div className={`font-semibold text-2xl mb-1 ${colors.textClass}`}>
+                  {label}
+                </div>
+                <div className={`font-bold leading-tight text-3xl ${colors.textClass}`}>
+                  {globalLufs?.toFixed(1) || 'N/A'}
+                  <span className="text-xl text-gray-400 ml-1">LUFS</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400">
+                LRA: {loudnessData?.global?.input_lra?.toFixed(1) || 'N/A'} •
+                TP: {loudnessData?.global?.input_tp?.toFixed(1) || 'N/A'} dBTP
+              </p>
             </div>
-            <div className="font-bold text-orange-300 mb-2 leading-tight text-4xl">
-              {globalLufs?.toFixed(1) || 'N/A'}
-              <span className="text-xl text-gray-400 ml-1">LUFS</span>
-            </div>
-            <p className="text-sm text-gray-400">
-              LRA: {loudnessData?.global?.input_lra?.toFixed(1) || 'N/A'} •
-              TP: {loudnessData?.global?.input_tp?.toFixed(1) || 'N/A'} dBTP
-            </p>
-          </div>
-        )}
+          );
+        })()}
 
         {stemDelta && isNumber(stemDelta?.lufs_delta) && stemDelta?.staging_assessment && (
           <div className={`bg-gradient-to-br rounded-lg p-5 border min-h-[180px] flex flex-col justify-between ${stemDelta.staging_assessment === 'balanced'
@@ -196,18 +204,28 @@ function ScoreCards({ results }) {
                 }`} />
               <h4 className="text-sm font-medium text-gray-300">Gain Staging</h4>
             </div>
-            <div className={`font-bold mb-2 leading-tight text-4xl ${stemDelta.staging_assessment === 'balanced'
-              ? 'text-green-300'
-              : stemDelta.staging_assessment === 'vocals_hot'
-                ? 'text-red-300'
-                : 'text-blue-300'
-              }`}>
-              {stemDelta.lufs_delta > 0 ? '+' : ''}{stemDelta.lufs_delta?.toFixed(1) || 'N/A'}
-              <span className="text-xl text-gray-400 ml-1">ΔLUFS</span>
+            <div>
+              <div className={`font-semibold text-2xl mb-1 ${stemDelta.staging_assessment === 'balanced'
+                ? 'text-green-300'
+                : stemDelta.staging_assessment === 'vocals_hot'
+                  ? 'text-red-300'
+                  : 'text-blue-300'
+                }`}>
+                {stemDelta.staging_assessment === 'balanced' ? 'Balanced' :
+                  stemDelta.staging_assessment === 'vocals_hot' ? 'Vocals Hot' : 'Vocals Soft'}
+              </div>
+              <div className={`font-bold leading-tight text-3xl ${stemDelta.staging_assessment === 'balanced'
+                ? 'text-green-300'
+                : stemDelta.staging_assessment === 'vocals_hot'
+                  ? 'text-red-300'
+                  : 'text-blue-300'
+                }`}>
+                {stemDelta.lufs_delta > 0 ? '+' : ''}{stemDelta.lufs_delta?.toFixed(1) || 'N/A'}
+                <span className="text-xl text-gray-400 ml-1">ΔLUFS</span>
+              </div>
             </div>
             <p className="text-sm text-gray-400">
-              {stemDelta.staging_assessment === 'balanced' ? 'Balanced' :
-                stemDelta.staging_assessment === 'vocals_hot' ? 'Vocals Hot' : 'Vocals Soft'}
+              Vocals {stemDelta.lufs_delta > 0 ? 'louder' : 'softer'} than instrumental by {Math.abs(stemDelta.lufs_delta).toFixed(1)} LUFS
             </p>
           </div>
         )}
@@ -238,6 +256,70 @@ function formatConfidence(value) {
     return '—';
   }
   return `${Math.round(value * 100)}%`;
+}
+
+function getSpectralLabel(score) {
+  if (!Number.isFinite(score)) {
+    return 'Unknown';
+  }
+  if (score >= 70) return 'Well-Balanced';
+  if (score >= 60) return 'Balanced';
+  if (score >= 50) return 'Unbalanced';
+  return 'Very Unbalanced';
+}
+
+function getLoudnessLabel(lufs) {
+  if (!Number.isFinite(lufs)) {
+    return 'Unknown';
+  }
+  if (lufs > -6) return 'Very Loud';
+  if (lufs > -10) return 'Loud';
+  if (lufs > -14) return 'Standard';
+  if (lufs > -18) return 'Quiet';
+  return 'Very Quiet';
+}
+
+function getLoudnessColors(lufs) {
+  if (!Number.isFinite(lufs)) {
+    return {
+      cardClass: 'from-gray-900/50 to-gray-800/30 border-gray-700/50',
+      iconClass: 'text-gray-400',
+      textClass: 'text-gray-300'
+    };
+  }
+  if (lufs > -6) {
+    return {
+      cardClass: 'from-red-900/50 to-red-800/30 border-red-700/50',
+      iconClass: 'text-red-400',
+      textClass: 'text-red-300'
+    };
+  }
+  if (lufs > -10) {
+    return {
+      cardClass: 'from-orange-900/50 to-orange-800/30 border-orange-700/50',
+      iconClass: 'text-orange-400',
+      textClass: 'text-orange-300'
+    };
+  }
+  if (lufs > -14) {
+    return {
+      cardClass: 'from-green-900/50 to-green-800/30 border-green-700/50',
+      iconClass: 'text-green-400',
+      textClass: 'text-green-300'
+    };
+  }
+  if (lufs > -18) {
+    return {
+      cardClass: 'from-blue-900/50 to-blue-800/30 border-blue-700/50',
+      iconClass: 'text-blue-400',
+      textClass: 'text-blue-300'
+    };
+  }
+  return {
+    cardClass: 'from-purple-900/50 to-purple-800/30 border-purple-700/50',
+    iconClass: 'text-purple-400',
+    textClass: 'text-purple-300'
+  };
 }
 
 export default ScoreCards;

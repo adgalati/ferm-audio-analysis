@@ -83,6 +83,27 @@ function App() {
 
       if (saveResult.success) {
         console.log('[App] Successfully saved to MongoDB:', saveResult.id);
+
+        // Auto-add to FAISS index if embedding exists
+        const embeddingPath = results?.autotagging?.embeddingPath || record.embeddingPath;
+        if (embeddingPath && saveResult.id) {
+          try {
+            const indexResult = await window.electronAPI.search('search:add-to-index', {
+              mongoId: saveResult.id,
+              embeddingPath,
+              sourceType: record.sourceType,
+              clipName,
+              topGenre: record.topGenre
+            });
+            if (indexResult.success) {
+              console.log('[App] Auto-added to FAISS index. Size:', indexResult.index_size);
+            } else {
+              console.warn('[App] Failed to add to index:', indexResult.error);
+            }
+          } catch (indexErr) {
+            console.warn('[App] Index add error:', indexErr);
+          }
+        }
       } else if (saveResult.queued) {
         console.log('[App] Record queued for sync:', saveResult.error);
       } else {

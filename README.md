@@ -4,7 +4,7 @@ A **Windows-native** desktop application for comprehensive audio analysis, featu
 
 ***Disclaimer*** This repo is largely 'vibe-coded' so excuse any mess. It works for my purposes. This is only the second app I've built to this extent. I use it primarily for my live streams and other research experiments.
 It's really just a prototype. It does build fine with npm run build:electron, just make sure to copy the config folder
-into the installation directory after running the executable.
+into the installation directory after running the executable (don't forget to turn on developer mode in Windows Security settings).
 
 Follow the ./SETUP_GUIDE.md for complete configuration instructions. I've only installed it on one other system besides my main PC, but it should work as-is on any other Windows system provided you have the tools properly installed and configured.
 

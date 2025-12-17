@@ -11,6 +11,7 @@ import { loadWindowsEnv } from '../src/utils/env.js';
 import { createFileWatcher } from '../src/services/file-watcher.js';
 import { explainGenre } from '../src/api/genre-explainer.js';
 import { getWatchPath, setWatchPath as saveWatchPath, getAllSettings } from './settings-store.js';
+import { addToIndex, findSimilar, computeNovelty, getIndexStatus } from '../src/services/search-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -899,6 +900,47 @@ app.on('before-quit', async () => {
   if (fileWatcher) {
     try { await fileWatcher.close(); } catch (_) { }
     fileWatcher = null;
+  }
+});
+
+// Search Service IPC Handlers
+ipcMain.handle('search:find-similar', async (event, { mongoId, embeddingPath, k, sourceTypeFilter }) => {
+  try {
+    const result = await findSimilar({ mongoId, embeddingPath, k, sourceTypeFilter });
+    return result;
+  } catch (error) {
+    console.error('[Search IPC] find-similar error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('search:compute-novelty', async (event, { mongoId, embeddingPath, k, sourceTypeFilter }) => {
+  try {
+    const result = await computeNovelty({ mongoId, embeddingPath, k, sourceTypeFilter });
+    return result;
+  } catch (error) {
+    console.error('[Search IPC] compute-novelty error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('search:add-to-index', async (event, { mongoId, embeddingPath, sourceType, clipName, topGenre }) => {
+  try {
+    const result = await addToIndex({ mongoId, embeddingPath, sourceType, clipName, topGenre });
+    return result;
+  } catch (error) {
+    console.error('[Search IPC] add-to-index error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('search:status', async () => {
+  try {
+    const result = await getIndexStatus();
+    return result;
+  } catch (error) {
+    console.error('[Search IPC] status error:', error);
+    return { success: false, error: error.message };
   }
 });
 

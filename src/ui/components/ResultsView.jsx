@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Music, Activity, Sparkles, Download, Volume2, Tag, Gauge, Star, Waves } from 'lucide-react';
+import { BarChart3, Music, Activity, Sparkles, Download, Volume2, Tag, Gauge, Star, Waves, Search } from 'lucide-react';
 import ScoreCards from './visualizations/ScoreCards';
 import WaveformDisplay from './visualizations/WaveformDisplay';
 import EnhancedWaveformDisplay from './visualizations/EnhancedWaveformDisplay';
@@ -17,6 +17,7 @@ import { LoudnessDisplay } from './visualizations/LoudnessDisplay';
 import AutoTagDisplay from './visualizations/AutoTagDisplay';
 import SpectralDisplay from './visualizations/SpectralDisplay.jsx';
 import StereoAnalysis from './visualizations/StereoAnalysis.jsx';
+import SearchTab from './visualizations/SearchTab.jsx';
 import ExportMenu from './ExportMenu';
 import FERMFactor from './FERMFactor.jsx';
 import FavoriteToggleButton from './FavoriteToggleButton.jsx';
@@ -183,6 +184,7 @@ function ResultsView({ results, audioFile }) {
     { id: 'loudness', name: 'Loudness', icon: Volume2, available: results?.loudness },
     { id: 'spatial', name: 'Stereo Field', icon: Waves, available: results?.spatial },
     { id: 'autotagging', name: 'Genre Tags', icon: Tag, available: results?.autotagging },
+    { id: 'search', name: 'Search', icon: Search, available: results?.autotagging?.embeddingPath || results?.embeddingPath },
     { id: 'ferm', name: 'FERM Factor', icon: Gauge, available: true },
   ].filter(tab => tab.id === 'overview' || tab.available);
 
@@ -256,7 +258,7 @@ function ResultsView({ results, audioFile }) {
                 stemsUsed={results.stemsUsed}
                 fullMixPath={audioFile?.path || results.file}
               />
-              
+
               {/* Tempo Display */}
               {results.rhythm.tempo_bpm && (
                 <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -344,6 +346,10 @@ function ResultsView({ results, audioFile }) {
 
           {activeTab === 'autotagging' && results.autotagging && (
             <AutoTagDisplay autotagging={results.autotagging} audioFile={audioFile} />
+          )}
+
+          {activeTab === 'search' && (
+            <SearchTab results={results} clipName={audioFile?.name} />
           )}
 
           {activeTab === 'ferm' && (

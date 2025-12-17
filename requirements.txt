@@ -1,0 +1,18 @@
+# FERM Audio Analysis - Python Dependencies
+# Install with: pip install -r requirements.txt
+#
+# This file covers all Python dependencies for the main .venv environment.
+# MAEST dependencies are installed separately in .venv/maest.
+
+# Core ML/Audio Framework
+torch>=2.0.0
+torchaudio>=2.0.0
+soundfile>=0.12.0  # Required by torchaudio for audio I/O
+
+# Stem Separation
+demucs>=4.0.0
+
+# FAISS Semantic Search
+faiss-cpu>=1.7.0
+pymongo>=4.0.0
+numpy>=1.24.0

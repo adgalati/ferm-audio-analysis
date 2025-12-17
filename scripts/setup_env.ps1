@@ -15,7 +15,12 @@ if (-not (Test-Path ".venv")) {
 Write-Host "Installing Demucs dependencies (CUDA enabled)..."
 & .\.venv\Scripts\python.exe -m pip install --upgrade pip
 & .\.venv\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-& .\.venv\Scripts\python.exe -m pip install demucs
+& .\.venv\Scripts\python.exe -m pip install demucs soundfile
+
+# Install FAISS dependencies (for semantic search)
+Write-Host "Installing FAISS dependencies..."
+& .\.venv\Scripts\python.exe -m pip install faiss-cpu pymongo numpy
+
 
 # 2. Create MAEST Venv
 Write-Host "`n--- Setting up MAEST Venv ---"

@@ -29,11 +29,17 @@ We have provided a helper script to automate this. Run:
 
 **What this script does:**
 1. Creates a main venv at `.venv`.
-2. Installs `demucs`, `torch`, and `torchaudio` (with CUDA support) into it.
-3. Creates a nested venv at `.venv\maest`.
-4. Installs `transformers`, `librosa`, and other MAEST deps into it.
+2. Installs `demucs`, `torch`, `torchaudio`, and `soundfile` (with CUDA support) into it.
+3. Installs FAISS dependencies: `faiss-cpu`, `pymongo`, `numpy` for semantic search.
+4. Creates a nested venv at `.venv\maest`.
+5. Installs `transformers`, `librosa`, and other MAEST deps into it.
 
 > **Note:** If you do not have an NVIDIA GPU, you may want to edit the script to remove `--index-url https://download.pytorch.org/whl/cu118` to install the CPU versions of Torch, though the CUDA versions usually work on CPU (just larger).
+
+**Alternative:** You can also install dependencies manually using the provided `requirements.txt`:
+```powershell
+pip install -r requirements.txt
+```
 
 ## 4. Install External Audio Tools
 

@@ -59,4 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('training-log', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('training-log');
   },
+
+  // Search / FAISS operations
+  search: (handler, data) => ipcRenderer.invoke(handler, data),
 });

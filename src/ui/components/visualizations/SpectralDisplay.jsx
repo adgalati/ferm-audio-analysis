@@ -428,7 +428,7 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
               Spectral Genre Fit
             </h3>
             <p className="text-sm text-slate-400 max-w-xl">
-              Compare your track's tonal balance against genre reference curves. Scores reflect how well your mix stays within tolerance bands (85+ = excellent, 70-84 = good, 50-69 = needs work).
+              Compare your track's tonal balance against genre reference curves. Labels indicate how well your mix stays within tolerance bands.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -436,14 +436,14 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
               const score = genreScores[genre];
               const isActive = genre === activeGenre;
               const scoreValue = Math.round(score ?? 0);
+              const label = getSpectralLabel(scoreValue);
 
-              // Color coding based on new scoring system
+              // Color coding based on label
               let scoreColor = 'text-gray-400';
-              if (scoreValue >= 85) scoreColor = 'text-emerald-400';
-              else if (scoreValue >= 70) scoreColor = 'text-cyan-400';
-              else if (scoreValue >= 50) scoreColor = 'text-yellow-400';
-              else if (scoreValue >= 30) scoreColor = 'text-orange-400';
-              else scoreColor = 'text-red-400';
+              if (label === 'Well-Balanced') scoreColor = 'text-emerald-400';
+              else if (label === 'Balanced') scoreColor = 'text-cyan-400';
+              else if (label === 'Unbalanced') scoreColor = 'text-yellow-400';
+              else if (label === 'Very Unbalanced') scoreColor = 'text-red-400';
 
               return (
                 <button
@@ -452,10 +452,10 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
                   onClick={() => handleGenreSelect(genre)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${isActive ? 'bg-indigo-600/80 border-indigo-400 text-white' : 'bg-gray-800/60 border-gray-700 text-gray-300 hover:bg-gray-800'}`}
                   aria-pressed={isActive}
-                  title={`${genre} fit: ${scoreValue}/100`}
+                  title={`${genre} fit: ${label}`}
                 >
                   <span className="block text-xs uppercase tracking-wide text-indigo-200/80">{genre}</span>
-                  <span className={`block text-lg font-semibold ${isActive ? 'text-white' : scoreColor}`}>{scoreValue}</span>
+                  <span className={`block text-sm font-semibold ${isActive ? 'text-white' : scoreColor}`}>{label}</span>
                 </button>
               );
             })}
@@ -472,7 +472,7 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
                   {GENRE_SPECTRAL_PROFILES[activeGenre]?.description || 'Genre target curve.'}
                 </p>
               </div>
-              <span className="text-2xl font-bold text-indigo-200">{Math.round(genreScores[activeGenre])} / 100</span>
+              <span className="text-2xl font-bold text-indigo-200">{getSpectralLabel(Math.round(genreScores[activeGenre]))}</span>
             </div>
             <div className="w-full h-3 rounded-full bg-gray-800 overflow-hidden">
               <div
@@ -532,7 +532,7 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
         fullWidth
         height={140}
       />
-    </div>
+    </div >
   );
 }
 
@@ -541,4 +541,14 @@ function clampScore(value) {
     return 0;
   }
   return Math.max(0, Math.min(100, value));
+}
+
+function getSpectralLabel(score) {
+  if (!Number.isFinite(score)) {
+    return 'Unknown';
+  }
+  if (score >= 70) return 'Well-Balanced';
+  if (score >= 60) return 'Balanced';
+  if (score >= 50) return 'Unbalanced';
+  return 'Very Unbalanced';
 }
