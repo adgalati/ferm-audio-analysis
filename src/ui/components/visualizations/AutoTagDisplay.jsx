@@ -101,79 +101,80 @@ function AutoTagDisplay({ autotagging, audioFile }) {
       {/* Conditional Rendering Based on Mode */}
       {visualizationMode === 'list' && (
         <>
-          {/* Top Result */}
+          {/* Top Result - Enhanced for Live Stream Visibility */}
           {tags.length > 0 && (
-            <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-6 border border-purple-700/50">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-1">Top Prediction</h4>
-                  <div className="text-2xl font-bold text-white">
-                    {tags[0].subgenre ? `${tags[0].genre} - ${tags[0].subgenre}` : tags[0].genre}
-                  </div>
+            <div className="bg-gradient-to-r from-purple-900/40 to-blue-900/40 rounded-2xl p-8 border border-purple-500/50 shadow-lg shadow-purple-900/20">
+              <div className="text-center mb-6">
+                <h4 className="text-base font-semibold text-purple-300 mb-3 uppercase tracking-widest">Top Prediction</h4>
+                <div className="text-4xl md:text-5xl font-extrabold text-white mb-4 leading-tight drop-shadow-lg">
+                  {tags[0].subgenre ? `${tags[0].genre} - ${tags[0].subgenre}` : tags[0].genre}
                 </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-purple-300">
-                    {Math.round(tags[0].score * 100)}
-                    <span className="text-lg text-gray-400">%</span>
-                  </div>
-                  <div className="text-xs text-gray-500">Confidence</div>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 drop-shadow-lg">
+                    {Math.round(tags[0].score * 100)}%
+                  </span>
+                  <span className="text-lg text-gray-400 font-medium">Confidence</span>
                 </div>
               </div>
 
-              <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+              <div className="w-full max-w-md mx-auto bg-gray-700/60 rounded-full h-3 mb-6 overflow-hidden">
                 <div
-                  className="bg-purple-500 h-2 rounded-full transition-all duration-500"
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
                   style={{ width: `${tags[0].score * 100}%` }}
                 />
               </div>
 
-              <button
-                onClick={handleCopyTopTag}
-                className="btn-secondary flex items-center gap-2 text-sm"
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied!' : 'Copy Tag'}
-              </button>
+              <div className="flex justify-center">
+                <button
+                  onClick={handleCopyTopTag}
+                  className="btn-secondary flex items-center gap-2 text-base px-5 py-2.5"
+                >
+                  {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                  {copied ? 'Copied!' : 'Copy Tag'}
+                </button>
+              </div>
             </div>
           )}
 
-          {/* All Results */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h4 className="text-base font-medium text-gray-300 mb-5 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
+          {/* All Results - Enhanced for Live Stream Visibility */}
+          <div className="bg-gray-800/80 rounded-2xl p-6 border border-gray-600">
+            <h4 className="text-lg font-semibold text-gray-200 mb-6 flex items-center justify-center gap-3">
+              <BarChart3 className="w-6 h-6 text-purple-400" />
               All Predictions ({tags.length})
             </h4>
 
             <div className="space-y-4">
               {tags.map((tag, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-4 h-4 rounded-full ${getGenreColor(tag.genre)}`} />
+                <div key={index} className="flex items-center justify-between p-5 bg-gray-700/60 rounded-xl border border-gray-600/50 hover:border-purple-500/50 transition-colors">
+                  <div className="flex items-center gap-5">
+                    <div className={`w-5 h-5 rounded-full ${getGenreColor(tag.genre)} shadow-lg`} />
                     <div>
-                      <div className="text-base font-semibold text-white">
+                      <div className="text-xl md:text-2xl font-bold text-white leading-tight">
                         {tag.subgenre ? `${tag.genre} - ${tag.subgenre}` : tag.genre}
                       </div>
-                      <div className="text-sm text-gray-400 mt-0.5">
+                      <div className="text-base text-gray-400 mt-1 font-medium">
                         #{index + 1} • {tag.genre}
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-gray-200 mb-1">
-                      {Math.round(tag.score * 100)}%
-                    </div>
-                    <div className="w-20 bg-gray-600 rounded-full h-2 mt-1">
-                      <div
-                        className={`h-2 rounded-full ${getGenreColor(tag.genre)}`}
-                        style={{ width: `${tag.score * 100}%` }}
-                      />
+                  <div className="text-right flex items-center gap-4">
+                    <div>
+                      <div className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-300">
+                        {Math.round(tag.score * 100)}%
+                      </div>
+                      <div className="w-24 bg-gray-600 rounded-full h-2.5 mt-2">
+                        <div
+                          className={`h-2.5 rounded-full ${getGenreColor(tag.genre)}`}
+                          style={{ width: `${tag.score * 100}%` }}
+                        />
+                      </div>
                     </div>
                     <button
                       onClick={() => handleExplain(tag.genre, tag.subgenre)}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm text-gray-200"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-base text-gray-200 border border-gray-600 hover:border-purple-500/50 transition-colors"
                     >
-                      <Info className="w-4 h-4" /> Explain
+                      <Info className="w-5 h-5" /> Explain
                     </button>
                   </div>
                 </div>

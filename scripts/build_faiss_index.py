@@ -28,9 +28,18 @@ import pymongo
 import numpy as np
 import faiss
 
+# Get project root - use FERM_REPO_PATH env var if set, otherwise fall back to __file__ relative
+def get_project_root():
+    """Get the project root directory. Uses FERM_REPO_PATH if set (for installed builds)."""
+    repo_path = os.environ.get('FERM_REPO_PATH')
+    if repo_path and os.path.isdir(repo_path):
+        return repo_path
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
 # Load environment from config/windows.env
 def load_env_file():
-    env_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'windows.env')
+    project_root = get_project_root()
+    env_path = os.path.join(project_root, 'config', 'windows.env')
     if os.path.exists(env_path):
         try:
             with open(env_path, 'r') as f:
@@ -49,10 +58,11 @@ def load_env_file():
 load_env_file()
 
 # Configuration
+PROJECT_ROOT = get_project_root()
 DATABASE_URI = os.environ.get('DATABASE_URI') or os.environ.get('MONGODB_URI')
 DB_NAME = 'ffactor-music'
 COLLECTION = 'analysis_records'
-INDEX_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'indexes')
+INDEX_OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'data', 'indexes')
 
 
 def log(message):
@@ -111,7 +121,7 @@ def build_index(target_source_type=None, dry_run=False):
     skipped_error = 0
     dimension = None
     
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    project_root = PROJECT_ROOT
     
     log("Scanning embeddings...")
     for doc in cursor:

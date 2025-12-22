@@ -20,9 +20,18 @@ import json
 import numpy as np
 import faiss
 
+# Get project root - use FERM_REPO_PATH env var if set, otherwise fall back to __file__ relative
+def get_project_root():
+    """Get the project root directory. Uses FERM_REPO_PATH if set (for installed builds)."""
+    repo_path = os.environ.get('FERM_REPO_PATH')
+    if repo_path and os.path.isdir(repo_path):
+        return repo_path
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
 # Load environment from config/windows.env
 def load_env_file():
-    env_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'windows.env')
+    project_root = get_project_root()
+    env_path = os.path.join(project_root, 'config', 'windows.env')
     if os.path.exists(env_path):
         try:
             with open(env_path, 'r') as f:
@@ -39,8 +48,8 @@ def load_env_file():
 
 load_env_file()
 
-# Paths
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# Paths - use FERM_REPO_PATH for fixed location access
+PROJECT_ROOT = get_project_root()
 INDEX_DIR = os.path.join(PROJECT_ROOT, 'data', 'indexes')
 INDEX_PATH = os.path.join(INDEX_DIR, 'main.index')
 ID_MAP_PATH = os.path.join(INDEX_DIR, 'id_map.json')

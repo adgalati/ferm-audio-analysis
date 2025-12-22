@@ -11,7 +11,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadWindowsEnv } from '../utils/env.js';
+import { loadWindowsEnv, getProjectRoot } from '../utils/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,8 +32,9 @@ function getEnv() {
  */
 async function runSearchCommand(command) {
     return new Promise((resolve, reject) => {
-        const pythonPath = path.join(__dirname, '../../.venv/Scripts/python.exe');
-        const scriptPath = path.join(__dirname, '../../scripts/search_faiss.py');
+        const projectRoot = getProjectRoot();
+        const pythonPath = path.join(projectRoot, '.venv/Scripts/python.exe');
+        const scriptPath = path.join(projectRoot, 'scripts/search_faiss.py');
 
         const proc = spawn(pythonPath, [scriptPath], {
             stdio: ['pipe', 'pipe', 'pipe'],
