@@ -12,6 +12,8 @@ import { createFileWatcher } from '../src/services/file-watcher.js';
 import { explainGenre } from '../src/api/genre-explainer.js';
 import { getWatchPath, setWatchPath as saveWatchPath, getAllSettings } from './settings-store.js';
 import { addToIndex, findSimilar, computeNovelty, getIndexStatus } from '../src/services/search-service.js';
+import { generateReport, generateReportFilename } from '../src/utils/report-generator.js';
+import { getModeConfig } from '../src/config/analysis-modes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -141,7 +143,23 @@ ipcMain.handle('read-audio-as-dataurl', async (event, filePath) => {
     const data = await fs.readFile(filePath);
     // Best-effort mime detection by extension
     const ext = path.extname(filePath).toLowerCase();
-    const mime = ext === '.wav' ? 'audio/wav' : ext === '.mp3' ? 'audio/mpeg' : 'application/octet-stream';
+    const mimeTypes = {
+      // Audio
+      '.wav': 'audio/wav',
+      '.mp3': 'audio/mpeg',
+      '.ogg': 'audio/ogg',
+      '.flac': 'audio/flac',
+      '.m4a': 'audio/mp4',
+      '.aac': 'audio/aac',
+      // Images
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml'
+    };
+    const mime = mimeTypes[ext] || 'application/octet-stream';
     const b64 = data.toString('base64');
     return { success: true, dataUrl: `data:${mime};base64,${b64}` };
   } catch (err) {
@@ -264,6 +282,82 @@ ipcMain.handle('cancel-analysis', async () => {
     return { success: true };
   } catch (_) {
     return { success: false, message: 'No analysis running' };
+  }
+});
+
+// Full Analysis Mode - runs all analyses and generates a structured JSON report
+ipcMain.handle('run-full-analysis', async (event, { audioPath }) => {
+  console.log('[Electron Main] run-full-analysis called for:', audioPath);
+
+  try {
+    if (currentAnalysis) {
+      return { success: false, error: 'Analysis already running' };
+    }
+
+    // Get full mode configuration
+    const modeConfig = getModeConfig('full');
+    console.log('[Electron Main] Full Analysis Mode config:', modeConfig);
+
+    // Progress callback
+    const onProgress = (progressData) => {
+      console.log('[Electron Main] Progress:', progressData);
+      event.sender.send('analysis-progress', progressData);
+    };
+
+    currentAbortController = new AbortController();
+    const signal = currentAbortController.signal;
+
+    // Run analysis with full mode settings
+    currentAnalysis = analyzeAudio({
+      audioPath,
+      analyses: modeConfig.analyses,
+      enableSmile: modeConfig.enableSmile,
+      useStems: modeConfig.useStems,
+      onProgress,
+      signal
+    });
+
+    console.log('[Electron Main] Waiting for full analysis results...');
+    const results = await currentAnalysis;
+    currentAnalysis = null;
+    currentAbortController = null;
+
+    // Generate structured report
+    console.log('[Electron Main] Generating structured report...');
+    const report = generateReport(results);
+
+    // Determine output path - use F:\FERM\analysis-output as configured
+    const env = loadWindowsEnv();
+    const outputDir = env.FULL_ANALYSIS_OUTPUT_DIR || 'F:\\FERM\\analysis-output';
+
+    // Ensure output directory exists
+    await fs.mkdir(outputDir, { recursive: true });
+
+    // Generate filename and save
+    const reportFilename = generateReportFilename(audioPath);
+    const reportPath = path.join(outputDir, reportFilename);
+
+    await fs.writeFile(reportPath, JSON.stringify(report, null, 2), 'utf-8');
+    console.log('[Electron Main] Report saved to:', reportPath);
+
+    return {
+      success: true,
+      data: results,
+      report: {
+        path: reportPath,
+        filename: reportFilename
+      }
+    };
+  } catch (error) {
+    console.error('[Electron Main] Full analysis error:', error);
+    console.error('[Electron Main] Error stack:', error.stack);
+    const wasAborted = error?.name === 'AbortError' || (error?.message || '').toLowerCase().includes('aborted');
+    currentAnalysis = null;
+    currentAbortController = null;
+    if (wasAborted) {
+      return { success: false, canceled: true };
+    }
+    return { success: false, error: error.message };
   }
 });
 

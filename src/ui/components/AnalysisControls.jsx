@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Activity, Music2, AudioWaveform, Sparkles, BarChart3, Waves } from 'lucide-react';
+import { Play, Activity, Music2, AudioWaveform, Sparkles, BarChart3, Waves, FileText } from 'lucide-react';
 
 function AnalysisControls({
   audioFile,
@@ -108,6 +108,57 @@ function AnalysisControls({
     runAnalysis(allAnalyses);
   };
 
+  const handleFullAnalysis = async () => {
+    console.log('[AnalysisControls] Starting Full Analysis & Report...');
+
+    // If no audio file is loaded, prompt user to select one
+    let targetFile = audioFile;
+    if (!targetFile) {
+      const selected = await window.electronAPI.selectFile();
+      if (!selected) {
+        console.log('[AnalysisControls] File selection cancelled');
+        return;
+      }
+      targetFile = selected;
+    }
+
+    onAnalysisStart();
+
+    // Listen for progress updates
+    const removeListener = window.electronAPI.onProgress((progress) => {
+      console.log('[AnalysisControls] Progress update:', progress);
+      onProgressUpdate(progress);
+    });
+
+    try {
+      console.log('[AnalysisControls] Calling electronAPI.runFullAnalysis...');
+      const result = await window.electronAPI.runFullAnalysis(targetFile.path);
+
+      console.log('[AnalysisControls] Full analysis result:', result);
+      removeListener();
+
+      if (result.success) {
+        console.log('[AnalysisControls] Full analysis successful!');
+        console.log('[AnalysisControls] Report saved to:', result.report?.path);
+        onAnalysisComplete(result.data, targetFile, {
+          sourceType: isMainstream ? 'mainstream' : 'independent',
+          reportPath: result.report?.path
+        });
+      } else if (result.canceled) {
+        console.log('[AnalysisControls] Full analysis was cancelled by user');
+        onProgressUpdate({ percent: 0, message: '' });
+        onAnalysisError(Object.assign(new Error('Analysis canceled'), { name: 'AbortError' }));
+      } else {
+        console.error('[AnalysisControls] Full analysis failed:', result.error);
+        onAnalysisError(new Error(result.error));
+      }
+    } catch (error) {
+      console.error('[AnalysisControls] Full analysis error:', error);
+      removeListener();
+      onAnalysisError(error);
+    }
+  };
+
   const handleIndividualAnalysis = (type) => {
     runAnalysis([type]);
   };
@@ -133,19 +184,19 @@ function AnalysisControls({
     <div className="card">
       <h2 className="text-2xl font-semibold mb-6">Analysis Options</h2>
 
-      {/* Analyze All Button */}
+      {/* Full Analysis & Report Button */}
       <div className="mb-6">
         <button
-          className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-3"
-          onClick={handleAnalyzeAll}
+          className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500"
+          onClick={handleFullAnalysis}
           disabled={disabled}
         >
-          <Play className="w-6 h-6" />
-          Analyze All
+          <FileText className="w-6 h-6" />
+          Full Analysis & Report
         </button>
         <p className="text-xs text-gray-500 mt-2 text-center">
-          Run complete analysis: Rhythm, Harmony, Spectral{hasOpenSmile ? ', Timbre' : ''}{hasFFmpeg ? ', Loudness, Spatial' : ''}{hasMAEST ? ', Auto-Tagging' : ''}
-          {useStems && hasDemucs ? ' (with stem separation)' : ''}
+          Comprehensive analysis with all tools (Rhythm, Harmony, Melody, Spectral, Timbre, Loudness, Spatial, Auto-Tagging).
+          Generates a structured JSON report for LLM mixing advice.
         </p>
       </div>
 

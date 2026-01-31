@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Analysis operations
   runAnalysis: (options) => ipcRenderer.invoke('run-analysis', options),
+  runFullAnalysis: (audioPath) => ipcRenderer.invoke('run-full-analysis', { audioPath }),
   cancelAnalysis: () => ipcRenderer.invoke('cancel-analysis'),
 
   // Progress updates
@@ -33,8 +34,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Genre explainer
   explainGenre: (payload) => ipcRenderer.invoke('genre-explainer:explain', payload),
 
-  // File reading
+  // File reading (supports audio and images)
   readAudioAsDataUrl: (filePath) => ipcRenderer.invoke('read-audio-as-dataurl', filePath),
+  readFileAsDataUrl: (filePath) => ipcRenderer.invoke('read-audio-as-dataurl', filePath),
 
   // MongoDB operations
   mongodb: (handler, data) => ipcRenderer.invoke(handler, data),

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BarChart3, Music, Activity, Sparkles, Download, Volume2, Tag, Gauge, Star, Waves, Search } from 'lucide-react';
 import ScoreCards from './visualizations/ScoreCards';
+import MelSpectrogramDisplay from './visualizations/MelSpectrogramDisplay';
 import WaveformDisplay from './visualizations/WaveformDisplay';
 import EnhancedWaveformDisplay from './visualizations/EnhancedWaveformDisplay';
 import SynchronizedDataPanel from './visualizations/SynchronizedDataPanel';
@@ -243,6 +244,9 @@ function ResultsView({ results, audioFile }) {
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <ScoreCards results={results} />
+              {results.melSpectrogram && (
+                <MelSpectrogramDisplay melSpectrogram={results.melSpectrogram} audioFile={audioFile} />
+              )}
               {results.rhythm && results.rhythm.beats?.length > 0 && (
                 <WaveformDisplay audioFile={audioFile} beats={results.rhythm.beats} downbeats={results.rhythm.downbeats} />
               )}

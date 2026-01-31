@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { execa } from 'execa';
-import { loadWindowsEnv } from '../utils/env.js';
+import { loadWindowsEnv, getProjectRoot } from '../utils/env.js';
 import { runSonicAnnotator } from '../runners/sonic.js';
 import { runOpenSmile } from '../runners/smile.js';
 import { runDemucs, checkDemucsAvailability } from '../runners/demucs.js';
@@ -219,6 +219,7 @@ export async function analyzeAudio({ audioPath, analyses = ['rhythm', 'harmony',
     autotagging: null,
     spectral: null,
     spatial: null,
+    melSpectrogram: null,
     scores: {}
   };
 
@@ -232,6 +233,7 @@ export async function analyzeAudio({ audioPath, analyses = ['rhythm', 'harmony',
   analyses.includes('loudness') && FFMPEG && stepWeights.push(20);
   analyses.includes('spatial') && FFMPEG && stepWeights.push(15);
   analyses.includes('autotagging') && stepWeights.push(10);
+  stepWeights.push(5); // Mel-spectrogram always runs
   const totalWeight = stepWeights.reduce((a, b) => a + b, 0) || 100;
   let completedWeight = 0;
 
@@ -891,6 +893,54 @@ export async function analyzeAudio({ audioPath, analyses = ['rhythm', 'harmony',
       console.warn('[Analysis Service] Spectral analysis failed, skipping:', error.message);
       result.spectral = null;
       updateProgress('Spectral analysis skipped (plugin error)', 10);
+    }
+  }
+
+  // Mel-Spectrogram Generation (always runs)
+  {
+    throwIfAborted();
+    onProgress && onProgress({ percent: Math.round((completedWeight / totalWeight) * 100), message: 'Generating mel-spectrogram...' });
+
+    try {
+      // Use getProjectRoot() for production compatibility (resolves to FERM_REPO_PATH in installed builds)
+      const projectRoot = getProjectRoot();
+      const melSpecScript = path.join(projectRoot, 'scripts', 'generate_mel_spectrogram.py');
+      const mainVenvPython = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
+
+      // Create unique output path in tmp directory (inside project root for write access)
+      const tmpDir = path.join(projectRoot, 'tmp');
+      await fs.mkdir(tmpDir, { recursive: true });
+      const melSpecOutputPath = path.join(tmpDir, `mel_spectrogram_${randomUUID()}.png`);
+
+      console.log('[Analysis Service] Generating mel-spectrogram:', {
+        script: melSpecScript,
+        python: mainVenvPython,
+        audio: audio,
+        output: melSpecOutputPath
+      });
+
+      const { stdout } = await execa(mainVenvPython, [melSpecScript, audio, melSpecOutputPath], {
+        timeout: 120000,
+        cancelSignal: signal
+      });
+
+      const melResult = JSON.parse(stdout);
+
+      if (melResult.success) {
+        result.melSpectrogram = {
+          imagePath: melResult.imagePath
+        };
+        console.log('[Analysis Service] Mel-spectrogram generated:', melResult.imagePath);
+      } else {
+        console.warn('[Analysis Service] Mel-spectrogram generation failed:', melResult.error);
+        result.melSpectrogram = null;
+      }
+
+      updateProgress('Mel-spectrogram complete', 5);
+    } catch (error) {
+      console.warn('[Analysis Service] Mel-spectrogram generation failed:', error.message);
+      result.melSpectrogram = null;
+      updateProgress('Mel-spectrogram skipped (error)', 5);
     }
   }
 
