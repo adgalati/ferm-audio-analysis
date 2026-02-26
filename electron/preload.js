@@ -62,6 +62,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeAllListeners('training-log');
   },
 
+  // Report / Infographic generation
+  report: (handler, data) => ipcRenderer.invoke(handler, data),
+
   // Search / FAISS operations
   search: (handler, data) => ipcRenderer.invoke(handler, data),
+
+  // UMAP progress events
+  onUmapProgress: (callback) => {
+    ipcRenderer.on('umap-progress', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('umap-progress');
+  },
 });

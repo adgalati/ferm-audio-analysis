@@ -188,3 +188,49 @@ export async function getIndexStatus() {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Get precomputed UMAP 2D coordinates for all tracks.
+ * 
+ * @param {Object} options
+ * @param {string} [options.sourceTypeFilter] - 'mainstream', 'independent', or null for all
+ * @param {number} [options.maxPoints=2000] - Max points to return for Chart.js performance
+ * @returns {Promise<Object>} - { success: boolean, points?: Array, total?: number, capped?: boolean }
+ */
+export async function getUmapData({ sourceTypeFilter = null, maxPoints = 2000 } = {}) {
+    console.log('[Search Service] Getting UMAP data, filter:', sourceTypeFilter);
+
+    try {
+        const result = await runSearchCommand({
+            command: 'get_umap_data',
+            source_type_filter: sourceTypeFilter,
+            max_points: maxPoints
+        });
+        return result;
+    } catch (error) {
+        console.error('[Search Service] Error getting UMAP data:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Look up a single track's UMAP position.
+ * 
+ * @param {Object} options
+ * @param {string} options.mongoId - MongoDB document _id or clipName
+ * @returns {Promise<Object>} - { success: boolean, point?: { id, x, y, clipName, topGenre, sourceType } }
+ */
+export async function getUmapPosition({ mongoId }) {
+    console.log('[Search Service] Getting UMAP position for:', mongoId);
+
+    try {
+        const result = await runSearchCommand({
+            command: 'get_umap_position',
+            mongo_id: mongoId
+        });
+        return result;
+    } catch (error) {
+        console.error('[Search Service] Error getting UMAP position:', error);
+        return { success: false, error: error.message };
+    }
+}

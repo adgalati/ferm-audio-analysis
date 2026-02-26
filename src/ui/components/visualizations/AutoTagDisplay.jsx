@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Tag, Copy, Check, BarChart3, Activity, Zap, Info } from 'lucide-react';
+import { Tag, Copy, Check, BarChart3, Activity, Zap, Info, AlertTriangle } from 'lucide-react';
 import GenreExplainModal from '../GenreExplainModal';
 import { getGenreColor } from '../../utils/genreColors';
 import GenreDNA from './GenreDNA';
 import GenreWaveformOverlay from './GenreWaveformOverlay';
+
+/** Genre confidence gate — tracks below this threshold are categorized as "Other" */
+const GENRE_CONFIDENCE_THRESHOLD = 0.10;
 
 function AutoTagDisplay({ autotagging, audioFile }) {
   const [copied, setCopied] = useState(false);
@@ -24,6 +27,7 @@ function AutoTagDisplay({ autotagging, audioFile }) {
   }
 
   const { model, tags } = autotagging;
+  const topScoreBelowThreshold = tags.length > 0 && tags[0].score < GENRE_CONFIDENCE_THRESHOLD;
 
   const handleCopyTopTag = () => {
     const topTag = tags[0];
@@ -132,6 +136,25 @@ function AutoTagDisplay({ autotagging, audioFile }) {
                   {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                   {copied ? 'Copied!' : 'Copy Tag'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* "Other" Classification Banner — shown when top confidence is below threshold */}
+          {topScoreBelowThreshold && (
+            <div className="bg-gradient-to-r from-amber-900/40 to-orange-900/40 rounded-xl p-5 border border-amber-500/50 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-600/30 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-amber-300 uppercase tracking-wide">Official Category: Other</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    Top prediction confidence ({Math.round(tags[0].score * 100)}%) is below the {Math.round(GENRE_CONFIDENCE_THRESHOLD * 100)}% threshold.
+                    This track is categorized as <span className="font-semibold text-amber-300">"Other"</span> for reporting and trend analysis.
+                    All predictions above are preserved.
+                  </div>
+                </div>
               </div>
             </div>
           )}

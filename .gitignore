@@ -27,6 +27,7 @@ output.txt
 #Generated assets
 /TonalBalance_*.PNG
 /docs/*.md
+FERMFactor_Title4.png
 
 # IDE & OS
 .cursor/

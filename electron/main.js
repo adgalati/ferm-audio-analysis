@@ -11,7 +11,7 @@ import { loadWindowsEnv } from '../src/utils/env.js';
 import { createFileWatcher } from '../src/services/file-watcher.js';
 import { explainGenre } from '../src/api/genre-explainer.js';
 import { getWatchPath, setWatchPath as saveWatchPath, getAllSettings } from './settings-store.js';
-import { addToIndex, findSimilar, computeNovelty, getIndexStatus } from '../src/services/search-service.js';
+import { addToIndex, findSimilar, computeNovelty, getIndexStatus, getUmapData, getUmapPosition } from '../src/services/search-service.js';
 import { generateReport, generateReportFilename } from '../src/utils/report-generator.js';
 import { getModeConfig } from '../src/config/analysis-modes.js';
 
@@ -421,6 +421,18 @@ ipcMain.handle('mongodb:initialize', async (event) => {
     }
 
     const result = await mongodbService.initializeConnection(uri);
+
+    // Auto-run idempotent genre confidence migration in background
+    if (result.success) {
+      mongodbService.migrateGenreConfidence().then(migResult => {
+        if (migResult.success && migResult.migratedCount > 0) {
+          console.log(`[MongoDB Init] Genre confidence migration: ${migResult.migratedCount} records updated`);
+        }
+      }).catch(err => {
+        console.warn('[MongoDB Init] Genre confidence migration failed (non-fatal):', err.message);
+      });
+    }
+
     return result;
   } catch (error) {
     console.error('[MongoDB IPC] Initialize error:', error);
@@ -649,6 +661,149 @@ ipcMain.handle('mongodb:update-source-type', async (event, payload) => {
     return await mongodbService.updateSourceType(payload.id, payload.sourceType);
   } catch (error) {
     console.error('[MongoDB IPC] update-source-type error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('mongodb:migrate-genre-confidence', async (event) => {
+  try {
+    if (!mongodbService) mongodbService = await import('../src/services/mongodb-service.js');
+    if (!mongodbService.isConnected()) return { success: false, error: 'Not connected to MongoDB' };
+    return await mongodbService.migrateGenreConfidence();
+  } catch (error) {
+    console.error('[MongoDB IPC] migrate-genre-confidence error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Report / Infographic Generation ---
+ipcMain.handle('report:generate-infographic', async (event, { dateFrom, dateTo, categories, aspectRatio, sourceType, userPrompt }) => {
+  try {
+    const env = loadWindowsEnv();
+    const apiKey = env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: 'GEMINI_API_KEY is not configured in windows.env' };
+    }
+
+    // Ensure MongoDB is available
+    if (!mongodbService) {
+      mongodbService = await import('../src/services/mongodb-service.js');
+    }
+    if (!mongodbService.isConnected()) {
+      return { success: false, error: 'MongoDB is not connected' };
+    }
+
+    // Query records in the date range
+    // Adjust dateTo to end-of-day so records from that full day are included
+    const queryOpts = { limit: 10000 };
+    if (dateFrom) queryOpts.dateFrom = dateFrom;
+    if (dateTo) {
+      // Append T23:59:59 so the $lte comparison includes the entire day
+      queryOpts.dateTo = dateTo.includes('T') ? dateTo : dateTo + 'T23:59:59';
+    }
+    if (sourceType) queryOpts.sourceType = sourceType;
+    const queryResult = await mongodbService.queryRecords(queryOpts);
+    if (!queryResult.success) {
+      return { success: false, error: queryResult.error || 'Failed to query records' };
+    }
+    if (queryResult.records.length === 0) {
+      return { success: false, error: 'No records found in the selected date range.' };
+    }
+
+    console.log(`[Report IPC] Found ${queryResult.records.length} records for infographic (sourceType: ${sourceType || 'all'})`);
+
+    // Aggregate insights — pass user-selected date range for display on the infographic
+    const { aggregateInsights, generateInfographic } = await import('../src/services/gemini-report-service.js');
+    const insights = aggregateInsights(queryResult.records, categories || [], { dateFrom, dateTo });
+
+    // Load logo as base64
+    const { getProjectRoot } = await import('../src/utils/env.js');
+    const logoPath = path.join(getProjectRoot(), 'FERMFactor_Title4.png');
+    let logoBase64 = '';
+    try {
+      const logoBuffer = await fs.readFile(logoPath);
+      logoBase64 = logoBuffer.toString('base64');
+    } catch (logoErr) {
+      console.warn('[Report IPC] Could not load logo:', logoErr.message);
+    }
+
+    // Generate infographic via Gemini
+    const result = await generateInfographic(insights, logoBase64, apiKey, {
+      aspectRatio: aspectRatio || '9:16',
+      imageSize: '2K',
+      userPrompt: userPrompt || null
+    });
+    if (result.success) {
+      return { success: true, imageBase64: result.imageBase64, mimeType: result.mimeType, insights };
+    } else {
+      return { success: false, error: result.error };
+    }
+  } catch (error) {
+    console.error('[Report IPC] generate-infographic error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('report:save-infographic', async (event, { imageBase64, filename }) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: filename || `ferm-report-${Date.now()}.png`,
+      filters: [
+        { name: 'PNG Image', extensions: ['png'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    const buffer = Buffer.from(imageBase64, 'base64');
+    await fs.writeFile(result.filePath, buffer);
+    console.log('[Report IPC] Infographic saved to:', result.filePath);
+    return { success: true, path: result.filePath };
+  } catch (error) {
+    console.error('[Report IPC] save-infographic error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('report:save-to-library', async (event, { imageBase64, metadata }) => {
+  try {
+    const { saveReportToLibrary } = await import('../src/services/gemini-report-service.js');
+    return await saveReportToLibrary(imageBase64, metadata);
+  } catch (error) {
+    console.error('[Report IPC] save-to-library error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('report:list-library', async (event) => {
+  try {
+    const { listSavedReports } = await import('../src/services/gemini-report-service.js');
+    return await listSavedReports();
+  } catch (error) {
+    console.error('[Report IPC] list-library error:', error);
+    return { success: false, error: error.message }; // Return empty list on error handled in UI
+  }
+});
+
+ipcMain.handle('report:load-library-image', async (event, { id }) => {
+  try {
+    const { loadReportImage } = await import('../src/services/gemini-report-service.js');
+    return await loadReportImage(id);
+  } catch (error) {
+    console.error('[Report IPC] load-library-image error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('report:delete-library-item', async (event, { id }) => {
+  try {
+    const { deleteReport } = await import('../src/services/gemini-report-service.js');
+    return await deleteReport(id);
+  } catch (error) {
+    console.error('[Report IPC] delete-library-item error:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1034,6 +1189,60 @@ ipcMain.handle('search:status', async () => {
     return result;
   } catch (error) {
     console.error('[Search IPC] status error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('search:get-umap-data', async (event, { sourceTypeFilter, maxPoints } = {}) => {
+  try {
+    const result = await getUmapData({ sourceTypeFilter, maxPoints });
+    return result;
+  } catch (error) {
+    console.error('[Search IPC] get-umap-data error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('search:get-umap-position', async (event, { mongoId }) => {
+  try {
+    const result = await getUmapPosition({ mongoId });
+    return result;
+  } catch (error) {
+    console.error('[Search IPC] get-umap-position error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('search:compute-umap', async (event) => {
+  try {
+    const { loadWindowsEnv, getProjectRoot } = await import('../src/utils/env.js');
+    const env = loadWindowsEnv();
+    const projectRoot = getProjectRoot();
+
+    const pythonPath = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
+    const scriptPath = path.join(projectRoot, 'scripts', 'compute_umap.py');
+
+    console.log('[Search IPC] Computing UMAP with:', pythonPath, scriptPath);
+
+    // Send progress to renderer
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.webContents.send('umap-progress', { percent: 10, message: 'Starting UMAP computation...' });
+
+    const { execa } = await import('execa');
+    const { stdout, stderr } = await execa(pythonPath, [scriptPath], {
+      windowsHide: true,
+      timeout: 300000, // 5 minute timeout
+      env: { ...process.env }
+    });
+
+    console.log('[Search IPC] UMAP stdout:', stdout);
+    if (stderr) console.log('[Search IPC] UMAP stderr:', stderr);
+
+    if (win) win.webContents.send('umap-progress', { percent: 100, message: 'UMAP complete' });
+
+    return { success: true, output: stdout };
+  } catch (error) {
+    console.error('[Search IPC] compute-umap error:', error);
     return { success: false, error: error.message };
   }
 });

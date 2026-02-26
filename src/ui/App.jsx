@@ -10,6 +10,7 @@ import FERMFavesTab from './components/FERMFavesTab.jsx';
 import WatchStatusIndicator from './components/WatchStatusIndicator.jsx';
 import Settings from './components/Settings.jsx';
 import TrainingView from './components/TrainingView.jsx';
+import ReportGeneratorPanel from './components/ReportGeneratorPanel.jsx';
 import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
 import { getHistory, addHistoryItem } from './stores/analysisHistory.js';
 import { transformResultsToRecord, reconstructResultsFromRecord } from '../utils/mongodb-schema.js';
@@ -20,7 +21,7 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState({ percent: 0, message: '' });
   const [error, setError] = useState(null);
-  const [activeMode, setActiveMode] = useState('analysis'); // 'analysis' | 'ferm' | 'cloud' | 'faves' | 'settings'
+  const [activeMode, setActiveMode] = useState('analysis'); // 'analysis' | 'ferm' | 'cloud' | 'faves' | 'settings' | 'reports'
   const [watchPath, setWatchPath] = useState('');
   const [showFileSelector, setShowFileSelector] = useState(false);
   const [availability, setAvailability] = useState([]);
@@ -97,6 +98,16 @@ function App() {
             });
             if (indexResult.success) {
               console.log('[App] Auto-added to FAISS index. Size:', indexResult.index_size);
+              // Recompute UMAP in background so the map is ready when the user views it
+              window.electronAPI.search('search:compute-umap', {}).then(umapResult => {
+                if (umapResult.success) {
+                  console.log('[App] UMAP recomputed after index update');
+                } else {
+                  console.warn('[App] UMAP recompute failed:', umapResult.error);
+                }
+              }).catch(umapErr => {
+                console.warn('[App] UMAP recompute error:', umapErr);
+              });
             } else {
               console.warn('[App] Failed to add to index:', indexResult.error);
             }
@@ -316,6 +327,13 @@ function App() {
                 Cloud Storage
               </button>
               <button
+                onClick={() => setActiveMode('reports')}
+                className={`px-4 py-2 text-sm border-b-2 transition-colors ${activeMode === 'reports' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-300'
+                  }`}
+              >
+                Reports
+              </button>
+              <button
                 onClick={() => setActiveMode('training')}
                 className={`px-4 py-2 text-sm border-b-2 transition-colors ${activeMode === 'training' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-300'
                   }`}
@@ -393,6 +411,10 @@ function App() {
                 autoSwitchToLeaderboard={shouldSwitchToLeaderboard}
                 onSwitchComplete={() => setShouldSwitchToLeaderboard(false)}
               />
+            </div>
+          ) : activeMode === 'reports' ? (
+            <div className="space-y-6">
+              <ReportGeneratorPanel />
             </div>
           ) : activeMode === 'settings' ? (
             <div className="space-y-6">

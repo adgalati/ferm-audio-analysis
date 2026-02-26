@@ -17,6 +17,9 @@ faiss-cpu>=1.7.0
 pymongo>=4.0.0
 numpy>=1.24.0
 
+# UMAP Dimensionality Reduction
+umap-learn>=0.5.0
+
 # Mel-Spectrogram Visualization
 librosa>=0.10.0
 matplotlib>=3.7.0

@@ -54,6 +54,7 @@ INDEX_DIR = os.path.join(PROJECT_ROOT, 'data', 'indexes')
 INDEX_PATH = os.path.join(INDEX_DIR, 'main.index')
 ID_MAP_PATH = os.path.join(INDEX_DIR, 'id_map.json')
 METADATA_PATH = os.path.join(INDEX_DIR, 'metadata.json')
+UMAP_COORDS_PATH = os.path.join(INDEX_DIR, 'umap_coords.json')
 
 
 def load_index():
@@ -353,6 +354,69 @@ def compute_novelty(mongo_id, embedding_path, k=10, source_type_filter=None):
         return {"success": False, "error": str(e)}
 
 
+def get_umap_data(source_type_filter=None, max_points=2000):
+    """
+    Read precomputed UMAP 2D coordinates from disk.
+
+    Args:
+        source_type_filter: Optional filter - 'mainstream', 'independent', or None
+        max_points: Maximum number of points to return (for Chart.js performance)
+
+    Returns:
+        dict with points array
+    """
+    if not os.path.exists(UMAP_COORDS_PATH):
+        return {"success": False, "error": "UMAP coordinates not found. Run compute_umap.py first."}
+
+    try:
+        with open(UMAP_COORDS_PATH, 'r', encoding='utf-8') as f:
+            points = json.load(f)
+
+        if source_type_filter and source_type_filter != 'all':
+            points = [p for p in points if p.get('sourceType') == source_type_filter]
+
+        # Cap at max_points for frontend performance
+        total = len(points)
+        if len(points) > max_points:
+            points = points[:max_points]
+
+        return {
+            "success": True,
+            "points": points,
+            "total": total,
+            "capped": total > max_points,
+            "source_type_filter": source_type_filter or "all"
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def get_umap_position(mongo_id):
+    """
+    Look up a single track's UMAP coordinates by its mongo ID or clipName.
+
+    Args:
+        mongo_id: MongoDB document _id or clipName
+
+    Returns:
+        dict with the track's x, y position (or error if not found)
+    """
+    if not os.path.exists(UMAP_COORDS_PATH):
+        return {"success": False, "error": "UMAP coordinates not found. Run compute_umap.py first."}
+
+    try:
+        with open(UMAP_COORDS_PATH, 'r', encoding='utf-8') as f:
+            points = json.load(f)
+
+        for point in points:
+            if point.get('id') == mongo_id or point.get('clipName') == mongo_id:
+                return {"success": True, "point": point}
+
+        return {"success": False, "error": f"Track not found in UMAP data: {mongo_id}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def main():
     """Main entry point - read JSON from stdin, process, write JSON to stdout."""
     try:
@@ -394,6 +458,15 @@ def main():
                     "index_size": index.ntotal if index else 0,
                     "id_map_size": len(id_map)
                 }
+            elif command == "get_umap_data":
+                result = get_umap_data(
+                    source_type_filter=cmd.get("source_type_filter"),
+                    max_points=cmd.get("max_points", 2000)
+                )
+            elif command == "get_umap_position":
+                result = get_umap_position(
+                    mongo_id=cmd.get("mongo_id")
+                )
             else:
                 result = {"success": False, "error": f"Unknown command: {command}"}
         

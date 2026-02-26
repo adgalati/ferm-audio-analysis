@@ -24,6 +24,9 @@ import FERMFactor from './FERMFactor.jsx';
 import FavoriteToggleButton from './FavoriteToggleButton.jsx';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 
+/** Genre confidence gate — tracks below this threshold are categorized as "Other" */
+const GENRE_CONFIDENCE_THRESHOLD = 0.10;
+
 function ResultsView({ results, audioFile }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isFavorite, setIsFavorite] = useState(false);
@@ -146,12 +149,18 @@ function ResultsView({ results, audioFile }) {
           hiphopSubstyle: results?.autotagging?.hiphop_substyle || null,
           timingMetrics: results?.rhythm?.timing || null,
           inKeyPercentage: results?.keyAnalysis?.inKeyPercentage || null,
-          topGenre: results?.autotagging?.genreTags?.[0]?.genre || null,
-          topGenreWithStyle: results?.autotagging?.genreTags?.[0]
-            ? (results.autotagging.genreTags[0].subgenre
-              ? `${results.autotagging.genreTags[0].genre} - ${results.autotagging.genreTags[0].subgenre}`
-              : results.autotagging.genreTags[0].genre)
-            : null,
+          topGenre: (() => {
+            const tag = results?.autotagging?.genreTags?.[0];
+            if (!tag) return null;
+            return tag.score >= GENRE_CONFIDENCE_THRESHOLD ? tag.genre : 'Other';
+          })(),
+          topGenreWithStyle: (() => {
+            const tag = results?.autotagging?.genreTags?.[0];
+            if (!tag) return null;
+            if (tag.score < GENRE_CONFIDENCE_THRESHOLD) return 'Other';
+            return tag.subgenre ? `${tag.genre} - ${tag.subgenre}` : tag.genre;
+          })(),
+          topGenreConfidence: results?.autotagging?.genreTags?.[0]?.score || null,
           analysisVersion: '1.0',
           isFavorite: newFavoriteStatus,
           favoriteMarkedAt: newFavoriteStatus ? new Date() : null,

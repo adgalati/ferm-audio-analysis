@@ -5,6 +5,13 @@ import { calculatePeriod } from './period-calculator.js';
  */
 
 /**
+ * Genre confidence threshold (10%).
+ * If the top genre tag's score falls below this, the track's official
+ * topGenre is set to "Other" — the raw genreTags array is never altered.
+ */
+export const GENRE_CONFIDENCE_THRESHOLD = 0.10;
+
+/**
  * Transform analysis results into a record for MongoDB storage
  * @param {string} clipName - Name of the audio clip
  * @param {Object} results - Full analysis results object
@@ -108,11 +115,19 @@ export function transformResultsToRecord(clipName, results, options = {}) {
     periodEnd,
     periodType,
 
-    // Metadata
-    topGenre: genreTags.length > 0 ? genreTags[0].genre : null,
-    topGenreWithStyle: genreTags.length > 0
-      ? (genreTags[0].subgenre ? `${genreTags[0].genre} - ${genreTags[0].subgenre}` : genreTags[0].genre)
+    // Metadata — genre confidence gating
+    //   If the top tag's score is below the threshold the track is
+    //   categorized as "Other" for trend analysis. The full genreTags
+    //   array is always preserved unmodified.
+    topGenre: genreTags.length > 0
+      ? (genreTags[0].score >= GENRE_CONFIDENCE_THRESHOLD ? genreTags[0].genre : 'Other')
       : null,
+    topGenreWithStyle: genreTags.length > 0
+      ? (genreTags[0].score >= GENRE_CONFIDENCE_THRESHOLD
+        ? (genreTags[0].subgenre ? `${genreTags[0].genre} - ${genreTags[0].subgenre}` : genreTags[0].genre)
+        : 'Other')
+      : null,
+    topGenreConfidence: genreTags.length > 0 ? genreTags[0].score : null,
     embeddingPath: results?.autotagging?.embeddingPath || null,
     hiphop_substyle: results?.autotagging?.hiphop_substyle || null,
     analysisVersion: '1.1',

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Download, Trash2, Database, RefreshCw, AlertCircle, Eye, X, Calendar, ExternalLink, ArrowLeftRight } from 'lucide-react';
+import { Cloud, Download, Trash2, Database, RefreshCw, AlertCircle, Eye, X, Calendar, ExternalLink, ArrowLeftRight, Map, List } from 'lucide-react';
 import CloudStorageFilters from './CloudStorageFilters';
 import FavoriteToggleButton from './FavoriteToggleButton.jsx';
+import UmapScatterPlot from './visualizations/UmapScatterPlot';
 
 // Detail Modal Component
 function RecordDetailModal({ record, onClose, onFavoriteToggled, onOpenAnalysis }) {
@@ -277,6 +278,7 @@ function CloudStoragePanel({ onSelectItem }) {
   const [filters, setFilters] = useState({});
   const [selectedRecords, setSelectedRecords] = useState(new Set());
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
   // Initialize connection on mount
   useEffect(() => {
@@ -640,211 +642,238 @@ function CloudStoragePanel({ onSelectItem }) {
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
+              <div className="flex bg-gray-700 rounded overflow-hidden ml-2">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1 text-sm flex items-center gap-1 transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-600'
+                    }`}
+                  title="List View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('map')}
+                  className={`px-3 py-1 text-sm flex items-center gap-1 transition-colors ${viewMode === 'map' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-600'
+                    }`}
+                  title="Map View"
+                >
+                  <Map className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="card overflow-hidden">
-            {isLoading && records.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <div className="inline-block animate-spin mb-3">
-                  <RefreshCw className="w-6 h-6" />
-                </div>
-                <p>Loading records...</p>
-              </div>
-            ) : records.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <Database className="w-8 h-8 mx-auto mb-3 opacity-50" />
-                <p>No records found</p>
-              </div>
-            ) : (
-              <>
-                {/* Top scroll bar */}
-                <div className="overflow-x-auto" onScroll={(e) => {
-                  const bottomScroll = e.currentTarget.parentElement.querySelector('.table-scroll-bottom');
-                  if (bottomScroll) bottomScroll.scrollLeft = e.currentTarget.scrollLeft;
-                }}>
-                  <div style={{ height: '1px', width: 'max-content', minWidth: '100%' }}>
-                    <table className="w-full text-sm" style={{ visibility: 'hidden', height: 0 }}>
-                      <thead>
-                        <tr>
-                          <th className="px-4 py-3">Select</th>
-                          <th className="px-4 py-3">Fav</th>
-                          <th className="px-4 py-3">Clip Name</th>
-                          <th className="px-4 py-3">Date</th>
-                          <th className="px-4 py-3">FERM</th>
-                          <th className="px-4 py-3">Key</th>
-                          <th className="px-4 py-3">Top Genre</th>
-                          <th className="px-4 py-3">Details</th>
-                          <th className="px-4 py-3">Actions</th>
-                        </tr>
-                      </thead>
-                    </table>
+          {/* Map View */}
+          {viewMode === 'map' && (
+            <div className="card p-4">
+              <UmapScatterPlot />
+            </div>
+          )}
+
+          {/* Table (List View) */}
+          {viewMode === 'list' && (
+            <div className="card overflow-hidden">
+              {isLoading && records.length === 0 ? (
+                <div className="p-8 text-center text-gray-400">
+                  <div className="inline-block animate-spin mb-3">
+                    <RefreshCw className="w-6 h-6" />
                   </div>
+                  <p>Loading records...</p>
                 </div>
-                {/* Main table with bottom scroll */}
-                <div className="overflow-x-auto table-scroll-bottom" onScroll={(e) => {
-                  const topScroll = e.currentTarget.parentElement.querySelector('.overflow-x-auto');
-                  if (topScroll && topScroll !== e.currentTarget) topScroll.scrollLeft = e.currentTarget.scrollLeft;
-                }}>
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-700 border-b border-gray-600">
-                      <tr>
-                        <th className="px-4 py-3 text-left">
-                          <input
-                            type="checkbox"
-                            checked={selectedRecords.size === records.length && records.length > 0}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedRecords(new Set(records.map(r => r._id)));
-                              } else {
-                                setSelectedRecords(new Set());
-                              }
-                            }}
-                            className="rounded"
-                          />
-                        </th>
-                        <th className="px-4 py-3 text-center font-semibold">Fav</th>
-                        <th
-                          onClick={() => handleSort('clipName')}
-                          className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
-                        >
-                          Clip Name {sortBy === 'clipName' && (sortOrder === -1 ? '↓' : '↑')}
-                        </th>
-                        <th
-                          onClick={() => handleSort('date')}
-                          className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
-                        >
-                          Date {sortBy === 'date' && (sortOrder === -1 ? '↓' : '↑')}
-                        </th>
-                        <th
-                          onClick={() => handleSort('fermFactor')}
-                          className="px-4 py-3 text-center cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
-                        >
-                          FERM {sortBy === 'fermFactor' && (sortOrder === -1 ? '↓' : '↑')}
-                        </th>
-                        <th className="px-4 py-3 text-center font-semibold">Key</th>
-                        <th
-                          onClick={() => handleSort('topGenre')}
-                          className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
-                        >
-                          Top Genre {sortBy === 'topGenre' && (sortOrder === -1 ? '↓' : '↑')}
-                        </th>
-                        <th className="px-4 py-3 text-center font-semibold">Details</th>
-                        <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {records.map((record, idx) => (
-                        <tr key={record._id} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
-                          <td className="px-4 py-3">
+              ) : records.length === 0 ? (
+                <div className="p-8 text-center text-gray-400">
+                  <Database className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                  <p>No records found</p>
+                </div>
+              ) : (
+                <>
+                  {/* Top scroll bar */}
+                  <div className="overflow-x-auto" onScroll={(e) => {
+                    const bottomScroll = e.currentTarget.parentElement.querySelector('.table-scroll-bottom');
+                    if (bottomScroll) bottomScroll.scrollLeft = e.currentTarget.scrollLeft;
+                  }}>
+                    <div style={{ height: '1px', width: 'max-content', minWidth: '100%' }}>
+                      <table className="w-full text-sm" style={{ visibility: 'hidden', height: 0 }}>
+                        <thead>
+                          <tr>
+                            <th className="px-4 py-3">Select</th>
+                            <th className="px-4 py-3">Fav</th>
+                            <th className="px-4 py-3">Clip Name</th>
+                            <th className="px-4 py-3">Date</th>
+                            <th className="px-4 py-3">FERM</th>
+                            <th className="px-4 py-3">Key</th>
+                            <th className="px-4 py-3">Top Genre</th>
+                            <th className="px-4 py-3">Details</th>
+                            <th className="px-4 py-3">Actions</th>
+                          </tr>
+                        </thead>
+                      </table>
+                    </div>
+                  </div>
+                  {/* Main table with bottom scroll */}
+                  <div className="overflow-x-auto table-scroll-bottom" onScroll={(e) => {
+                    const topScroll = e.currentTarget.parentElement.querySelector('.overflow-x-auto');
+                    if (topScroll && topScroll !== e.currentTarget) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+                  }}>
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-700 border-b border-gray-600">
+                        <tr>
+                          <th className="px-4 py-3 text-left">
                             <input
                               type="checkbox"
-                              checked={selectedRecords.has(record._id)}
+                              checked={selectedRecords.size === records.length && records.length > 0}
                               onChange={(e) => {
-                                const newSelected = new Set(selectedRecords);
                                 if (e.target.checked) {
-                                  newSelected.add(record._id);
+                                  setSelectedRecords(new Set(records.map(r => r._id)));
                                 } else {
-                                  newSelected.delete(record._id);
+                                  setSelectedRecords(new Set());
                                 }
-                                setSelectedRecords(newSelected);
                               }}
                               className="rounded"
                             />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <FavoriteToggleButton
-                              recordId={record._id}
-                              clipName={record.clipName}
-                              isFavorite={record.isFavorite}
-                              onToggled={(fav) => {
-                                const next = [...records];
-                                next[idx] = { ...record, isFavorite: fav };
-                                setRecords(next);
-                              }}
-                            />
-                          </td>
-                          <td className="px-4 py-3 truncate max-w-xs" title={record.clipName}>
-                            {onSelectItem ? (
-                              <button
-                                onClick={() => onSelectItem(record)}
-                                className="text-blue-400 hover:text-blue-300 hover:underline text-left truncate w-full"
-                              >
-                                {record.clipName}
-                              </button>
-                            ) : (
-                              record.clipName
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-400">
-                            <div>{new Date(record.date).toLocaleString()}</div>
-                            <div className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> {record.timePeriod || '—'}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center font-semibold text-blue-300">
-                            {record.fermFactor?.toFixed(2) || 'N/A'}
-                          </td>
-                          <td className="px-4 py-3 text-center font-medium">
-                            {record.keyFit?.key || 'N/A'}
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-block bg-purple-900/50 px-2 py-1 rounded text-purple-300 max-w-xs truncate">
-                                {record.topGenreWithStyle || record.topGenre || 'Unknown'}
-                              </span>
-                              {record.sourceType === 'mainstream' && (
-                                <span className="inline-block bg-amber-900/50 px-2 py-1 rounded text-amber-300 text-xs font-semibold">
-                                  Mainstream
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => setSelectedRecord(record)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-gray-100 transition-colors text-xs"
-                            >
-                              <Eye className="w-3 h-3" />
-                              View
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {onSelectItem && (
+                          </th>
+                          <th className="px-4 py-3 text-center font-semibold">Fav</th>
+                          <th
+                            onClick={() => handleSort('clipName')}
+                            className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
+                          >
+                            Clip Name {sortBy === 'clipName' && (sortOrder === -1 ? '↓' : '↑')}
+                          </th>
+                          <th
+                            onClick={() => handleSort('date')}
+                            className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
+                          >
+                            Date {sortBy === 'date' && (sortOrder === -1 ? '↓' : '↑')}
+                          </th>
+                          <th
+                            onClick={() => handleSort('fermFactor')}
+                            className="px-4 py-3 text-center cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
+                          >
+                            FERM {sortBy === 'fermFactor' && (sortOrder === -1 ? '↓' : '↑')}
+                          </th>
+                          <th className="px-4 py-3 text-center font-semibold">Key</th>
+                          <th
+                            onClick={() => handleSort('topGenre')}
+                            className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600 transition-colors font-semibold"
+                          >
+                            Top Genre {sortBy === 'topGenre' && (sortOrder === -1 ? '↓' : '↑')}
+                          </th>
+                          <th className="px-4 py-3 text-center font-semibold">Details</th>
+                          <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {records.map((record, idx) => (
+                          <tr key={record._id} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedRecords.has(record._id)}
+                                onChange={(e) => {
+                                  const newSelected = new Set(selectedRecords);
+                                  if (e.target.checked) {
+                                    newSelected.add(record._id);
+                                  } else {
+                                    newSelected.delete(record._id);
+                                  }
+                                  setSelectedRecords(newSelected);
+                                }}
+                                className="rounded"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <FavoriteToggleButton
+                                recordId={record._id}
+                                clipName={record.clipName}
+                                isFavorite={record.isFavorite}
+                                onToggled={(fav) => {
+                                  const next = [...records];
+                                  next[idx] = { ...record, isFavorite: fav };
+                                  setRecords(next);
+                                }}
+                              />
+                            </td>
+                            <td className="px-4 py-3 truncate max-w-xs" title={record.clipName}>
+                              {onSelectItem ? (
                                 <button
                                   onClick={() => onSelectItem(record)}
-                                  className="p-1 hover:bg-blue-600/30 rounded text-blue-400 hover:text-blue-300 transition-colors"
-                                  title="Open Analysis"
+                                  className="text-blue-400 hover:text-blue-300 hover:underline text-left truncate w-full"
                                 >
-                                  <ExternalLink className="w-4 h-4" />
+                                  {record.clipName}
                                 </button>
+                              ) : (
+                                record.clipName
                               )}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-400">
+                              <div>{new Date(record.date).toLocaleString()}</div>
+                              <div className="text-[10px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
+                                <Calendar className="w-3 h-3" /> {record.timePeriod || '—'}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold text-blue-300">
+                              {record.fermFactor?.toFixed(2) || 'N/A'}
+                            </td>
+                            <td className="px-4 py-3 text-center font-medium">
+                              {record.keyFit?.key || 'N/A'}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block bg-purple-900/50 px-2 py-1 rounded text-purple-300 max-w-xs truncate">
+                                  {record.topGenreWithStyle || record.topGenre || 'Unknown'}
+                                </span>
+                                {record.sourceType === 'mainstream' && (
+                                  <span className="inline-block bg-amber-900/50 px-2 py-1 rounded text-amber-300 text-xs font-semibold">
+                                    Mainstream
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
                               <button
-                                onClick={() => handleToggleSourceType(record._id, record.sourceType || 'independent')}
-                                className="p-1 hover:bg-amber-600/30 rounded text-amber-400 hover:text-amber-300 transition-colors"
-                                title={`Toggle: ${record.sourceType === 'mainstream' ? 'Set to Independent' : 'Set to Mainstream'}`}
+                                onClick={() => setSelectedRecord(record)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-gray-100 transition-colors text-xs"
                               >
-                                <ArrowLeftRight className="w-4 h-4" />
+                                <Eye className="w-3 h-3" />
+                                View
                               </button>
-                              <button
-                                onClick={() => handleDeleteRecord(record._id)}
-                                className="p-1 hover:bg-red-600/30 rounded text-red-400 hover:text-red-300 transition-colors"
-                                title="Delete record"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {onSelectItem && (
+                                  <button
+                                    onClick={() => onSelectItem(record)}
+                                    className="p-1 hover:bg-blue-600/30 rounded text-blue-400 hover:text-blue-300 transition-colors"
+                                    title="Open Analysis"
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleToggleSourceType(record._id, record.sourceType || 'independent')}
+                                  className="p-1 hover:bg-amber-600/30 rounded text-amber-400 hover:text-amber-300 transition-colors"
+                                  title={`Toggle: ${record.sourceType === 'mainstream' ? 'Set to Independent' : 'Set to Mainstream'}`}
+                                >
+                                  <ArrowLeftRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteRecord(record._id)}
+                                  className="p-1 hover:bg-red-600/30 rounded text-red-400 hover:text-red-300 transition-colors"
+                                  title="Delete record"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -886,15 +915,17 @@ function CloudStoragePanel({ onSelectItem }) {
       </div>
 
       {/* Detail Modal */}
-      {selectedRecord && (
-        <RecordDetailModal
-          record={selectedRecord}
-          onClose={() => setSelectedRecord(null)}
-          onFavoriteToggled={(fav) => setSelectedRecord(sr => ({ ...sr, isFavorite: fav }))}
-          onOpenAnalysis={onSelectItem}
-        />
-      )}
-    </div>
+      {
+        selectedRecord && (
+          <RecordDetailModal
+            record={selectedRecord}
+            onClose={() => setSelectedRecord(null)}
+            onFavoriteToggled={(fav) => setSelectedRecord(sr => ({ ...sr, isFavorite: fav }))}
+            onOpenAnalysis={onSelectItem}
+          />
+        )
+      }
+    </div >
   );
 }
 

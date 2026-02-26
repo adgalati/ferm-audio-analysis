@@ -587,3 +587,71 @@ export async function exportRecords(filters = {}) {
     };
   }
 }
+
+/**
+ * One-time migration: retroactively apply the 10% genre-confidence gate
+ * to all existing records. For each record:
+ *   - Reads genreTags[0].score
+ *   - If < GENRE_CONFIDENCE_THRESHOLD → sets topGenre / topGenreWithStyle to "Other"
+ *   - Backfills topGenreConfidence field
+ * Records that already have topGenre === "Other" or have no genreTags are skipped.
+ * @param {number} threshold - Confidence threshold (default 0.10)
+ * @returns {Promise<Object>} { success, migratedCount, skippedCount, error? }
+ */
+export async function migrateGenreConfidence(threshold = 0.10) {
+  try {
+    if (!collection) throw new Error('MongoDB not connected');
+
+    // Find all records that have at least one genre tag
+    const cursor = collection.find({ 'genreTags.0': { $exists: true } });
+    let migratedCount = 0;
+    let skippedCount = 0;
+
+    while (await cursor.hasNext()) {
+      const doc = await cursor.next();
+      const topTag = doc.genreTags[0];
+      if (!topTag || typeof topTag.score !== 'number') {
+        skippedCount++;
+        continue;
+      }
+
+      const score = topTag.score;
+      const needsGate = score < threshold;
+
+      // Determine what the correct topGenre should be
+      const correctTopGenre = needsGate ? 'Other' : topTag.genre;
+      const correctTopGenreWithStyle = needsGate
+        ? 'Other'
+        : (topTag.subgenre ? `${topTag.genre} - ${topTag.subgenre}` : topTag.genre);
+
+      // Check if an update is actually needed
+      const needsUpdate =
+        doc.topGenre !== correctTopGenre ||
+        doc.topGenreWithStyle !== correctTopGenreWithStyle ||
+        doc.topGenreConfidence === undefined;
+
+      if (!needsUpdate) {
+        skippedCount++;
+        continue;
+      }
+
+      await collection.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            topGenre: correctTopGenre,
+            topGenreWithStyle: correctTopGenreWithStyle,
+            topGenreConfidence: score
+          }
+        }
+      );
+      migratedCount++;
+    }
+
+    console.log(`[MongoDB] Genre confidence migration complete: ${migratedCount} updated, ${skippedCount} skipped`);
+    return { success: true, migratedCount, skippedCount };
+  } catch (error) {
+    console.error('[MongoDB] Genre confidence migration error:', error);
+    return { success: false, error: error.message };
+  }
+}
