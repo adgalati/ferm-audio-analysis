@@ -12,7 +12,7 @@ import { LOADED_TONAL_PROFILES } from './tonal-profile-loader.js';
 
 const TARGET_POINT_COUNT = 60;
 const FREQ_MIN = 25;
-const FREQ_MAX = 16000;
+const FREQ_MAX = 20000;
 const EPSILON = 1e-6;
 
 const TARGET_CENTERS_HZ = Array.from({ length: TARGET_POINT_COUNT }, (_, i) => {

@@ -366,7 +366,7 @@ export async function generateInfographic(insights, logoBase64, apiKey, options 
 function buildPrompt(insights, aspectRatio = '9:16') {
     const lines = [
         'Generate a visually stunning infographic image for the following audio analysis report data.',
-        `Total tracks analyzed: ${insights.totalTracks}`,
+        `Total Submissions: ${insights.totalTracks}`,
     ];
 
     if (insights.dateRange.earliest && insights.dateRange.latest) {

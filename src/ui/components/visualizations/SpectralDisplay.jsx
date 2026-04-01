@@ -18,7 +18,7 @@ import { FREQUENCY_BANDS, GENRE_SPECTRAL_PROFILES, TARGET_CENTERS_HZ } from '../
 ChartJS.register(CategoryScale, LinearScale, LogarithmicScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 // Hand-picked logarithmic tick values (like Tonal Balance Control - minimal set to prevent overlap)
-const LOG_TICK_VALUES = [40, 100, 200, 600, 1000, 2000, 4000, 6000, 10000];
+const LOG_TICK_VALUES = [40, 100, 200, 600, 1000, 2000, 4000, 6000, 10000, 16000, 20000];
 
 // Macro-band edge separators
 // Macro-band edge separators
@@ -144,17 +144,9 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
       }
     }
 
-    // Max: find the first tick value above the maximum data frequency
-    let max = allPossibleTicks[allPossibleTicks.length - 1];
-    for (const tick of allPossibleTicks) {
-      if (tick > maxDataFreq) {
-        max = tick;
-        break;
-      }
-    }
+    // Max: always extend to 20 kHz to show the full audible spectrum
+    const max = 20000;
 
-    // Note: We always use LOG_TICK_VALUES for labels (which ends at 10 kHz)
-    // but the axis max can extend beyond to show all data
     return { min, max };
   }, [bandCenters]);
 
@@ -184,9 +176,23 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
       (activeProfile?.frequencyTargets?.[key]?.target ?? 0) * DISPLAY_SCALE
     );
 
-    // Band-level points for target and audio
+    // Band-level points for target and audio markers
     const targetPoints = targetLevels.map((value, idx) => ({ x: bandCenters[idx], y: value }));
     const actualPoints = actualLevels.map((value, idx) => ({ x: bandCenters[idx], y: value }));
+
+    // High-res "Your Audio" curve from LTAS data (80 log-spaced points)
+    const ltasHighres = spectralData?.raw_data?.ltas;
+    let highResActualCurve = null;
+    if (ltasHighres?.highres_frequencies?.length && ltasHighres?.highres_db?.length) {
+      highResActualCurve = [];
+      for (let i = 0; i < ltasHighres.highres_frequencies.length; i++) {
+        const f = ltasHighres.highres_frequencies[i];
+        const db = ltasHighres.highres_db[i];
+        if (f > 0 && Number.isFinite(db)) {
+          highResActualCurve.push({ x: f, y: (db - activeAlignmentOffset) * DISPLAY_SCALE });
+        }
+      }
+    }
 
     // Continuous tolerance tube from the profile's curve
     const highRes = activeProfile?.highResCurve;
@@ -216,71 +222,75 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
       upperCurve = curve.p90Db.map((y, i) => ({ x: TARGET_CENTERS_HZ[i], y: y * DISPLAY_SCALE }));
     }
 
-    return {
-      datasets: [
-        // 1) Lower tolerance curve (invisible, drawn first)
-        {
-          id: 'tolLowerCurve',
-          label: 'Tolerance (lower)',
-          data: lowerCurve,
-          borderColor: 'rgba(0,0,0,0)',
-          backgroundColor: 'rgba(0,0,0,0)',
-          pointRadius: 0,
-          tension: 0.35,
-          fill: false,
-          parsing: false,
-          order: 1,
-          spanGaps: true
-        },
-        // 2) Upper tolerance curve (fills to previous dataset = tube)
-        {
-          id: 'tolUpperCurve',
-          label: 'Tolerance Band',
-          data: upperCurve,
-          borderColor: 'rgba(0,0,0,0)',
-          backgroundColor: 'rgba(129,140,248,0.18)',
-          pointRadius: 0,
-          tension: 0.35,
-          fill: '-1',  // Fill to previous dataset (creates the tube)
-          parsing: false,
-          order: 1,
-          spanGaps: true
-        },
-        // 3) Target dotted line
-        {
-          id: 'target',
-          label: `${activeGenre || detectedGenre || 'Genre'} Target`,
-          data: targetPoints,
-          borderColor: '#818cf8',
-          borderDash: [6, 4],
-          borderWidth: 2,
-          pointRadius: 4,
-          pointBackgroundColor: '#818cf8',
-          pointHoverRadius: 5,
-          tension: 0.35,
-          fill: false,
-          parsing: false,
-          order: 2
-        },
-        // 4) Your audio
-        {
-          id: 'actual',
-          label: 'Your Audio',
-          data: actualPoints,
-          borderColor: '#22d3ee',
-          backgroundColor: 'rgba(34,211,238,0.1)',
-          borderWidth: 3,
-          pointRadius: 5,
-          pointBackgroundColor: '#22d3ee',
-          pointHoverRadius: 6,
-          tension: 0.35,
-          fill: false,
-          parsing: false,
-          order: 3
-        }
-      ]
-    };
-  }, [spectralData?.frequencyBands, activeProfile, activeGenre, detectedGenre, bandKeys, bandCenters, activeAlignmentOffset]);
+    // Choose the best "Your Audio" line data
+    const audioLineData = highResActualCurve && highResActualCurve.length > 0
+      ? highResActualCurve
+      : actualPoints;
+
+    const datasets = [
+      // 1) Lower tolerance curve (invisible, drawn first)
+      {
+        id: 'tolLowerCurve',
+        label: 'Tolerance (lower)',
+        data: lowerCurve,
+        borderColor: 'rgba(0,0,0,0)',
+        backgroundColor: 'rgba(0,0,0,0)',
+        pointRadius: 0,
+        tension: 0.35,
+        fill: false,
+        parsing: false,
+        order: 1,
+        spanGaps: true
+      },
+      // 2) Upper tolerance curve (fills to previous dataset = tube)
+      {
+        id: 'tolUpperCurve',
+        label: 'Tolerance Band',
+        data: upperCurve,
+        borderColor: 'rgba(0,0,0,0)',
+        backgroundColor: 'rgba(129,140,248,0.18)',
+        pointRadius: 0,
+        tension: 0.35,
+        fill: '-1',  // Fill to previous dataset (creates the tube)
+        parsing: false,
+        order: 1,
+        spanGaps: true
+      },
+      // 3) Target dotted line
+      {
+        id: 'target',
+        label: `${activeGenre || detectedGenre || 'Genre'} Target`,
+        data: targetPoints,
+        borderColor: '#818cf8',
+        borderDash: [6, 4],
+        borderWidth: 2,
+        pointRadius: 0,
+        pointBackgroundColor: '#818cf8',
+        pointHoverRadius: 3,
+        tension: 0.35,
+        fill: false,
+        parsing: false,
+        order: 2
+      },
+      // 4) Your audio — smooth high-res curve
+      {
+        id: 'actual',
+        label: 'Your Audio',
+        data: audioLineData,
+        borderColor: '#22d3ee',
+        backgroundColor: 'rgba(34,211,238,0.1)',
+        borderWidth: 3,
+        pointRadius: 0,
+        pointBackgroundColor: '#22d3ee',
+        pointHoverRadius: 4,
+        tension: 0.35,
+        fill: false,
+        parsing: false,
+        order: 3
+      },
+    ];
+    return { datasets };
+  }, [spectralData?.frequencyBands, spectralData?.raw_data?.ltas, activeProfile, activeGenre, detectedGenre, bandKeys, bandCenters, activeAlignmentOffset]);
 
   const bandEdgesPlugin = useMemo(() => ({
     id: 'bandEdges',
@@ -494,7 +504,7 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
           <Sparkles className="w-5 h-5 text-cyan-400" aria-hidden="true" />
           <h3 className="text-lg font-semibold text-slate-100">Tonal Balance Comparison</h3>
         </div>
-        <div className="h-[40rem]">
+        <div className="w-full h-[75vh] min-h-[500px]">
           <Line data={tonalChartData} options={tonalChartOptions} plugins={[bandEdgesPlugin, bandLabelPlugin]} />
         </div>
       </section>

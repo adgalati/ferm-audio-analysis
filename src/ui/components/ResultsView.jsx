@@ -37,13 +37,43 @@ function ResultsView({ results, audioFile }) {
   React.useEffect(() => {
     if (audioFile) {
       // Add a small delay to prevent rapid successive loads
-      const timeoutId = setTimeout(() => {
-        loadAudio(audioFile);
+      const timeoutId = setTimeout(async () => {
+        let success = false;
+        
+        // 1. Try original file
+        const resFull = await window.electronAPI.readAudioAsDataUrl(audioFile.path);
+        if (resFull?.success) {
+          loadAudio(audioFile);
+          success = true;
+        } 
+        
+        // 2. Try instrumental fallback
+        if (!success && results?.instrumentalPath) {
+          const resInst = await window.electronAPI.readAudioAsDataUrl(results.instrumentalPath);
+          if (resInst?.success) {
+            loadAudio({ path: results.instrumentalPath, name: 'Instrumental Stem (Fallback)' });
+            success = true;
+          }
+        }
+        
+        // 3. Try vocal fallback
+        if (!success && results?.vocalPath) {
+          const resVoc = await window.electronAPI.readAudioAsDataUrl(results.vocalPath);
+          if (resVoc?.success) {
+            loadAudio({ path: results.vocalPath, name: 'Vocal Stem (Fallback)' });
+            success = true;
+          }
+        }
+        
+        // 4. Default to original if everything fails (so it attempts and errors appropriately)
+        if (!success) {
+          loadAudio(audioFile);
+        }
       }, 100);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [audioFile]); // Remove loadAudio from dependencies to prevent infinite loop
+  }, [audioFile, results, loadAudio]);
 
   // Listen for seek events from visualizations
   React.useEffect(() => {
@@ -200,7 +230,7 @@ function ResultsView({ results, audioFile }) {
 
   return (
     <div className="space-y-6">
-      <div className="card">
+      <div className="bg-gray-800/60 backdrop-blur-md rounded-2xl p-6 border border-gray-600/50 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-white/5 transition-all hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-semibold">Analysis Results</h2>
@@ -211,18 +241,12 @@ function ResultsView({ results, audioFile }) {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleMarkAsFavorite}
-              disabled={isMarkingFavorite}
-              className={`px-4 py-2 rounded text-sm font-medium transition-colors flex items-center gap-2 ${isFavorite
-                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                } ${isMarkingFavorite ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <Star className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-              {isMarkingFavorite ? 'Marking...' : (isFavorite ? 'Marked as Favorite' : 'Mark as Favorite')}
-            </button>
-            <ExportMenu results={results} />
+            <ExportMenu 
+              results={results} 
+              isFavorite={isFavorite}
+              isMarkingFavorite={isMarkingFavorite}
+              onMarkFavorite={handleMarkAsFavorite}
+            />
           </div>
         </div>
 
@@ -283,7 +307,7 @@ function ResultsView({ results, audioFile }) {
                       <div>
                         <div className="text-sm text-gray-400">Detected Tempo</div>
                         <div className="text-3xl font-bold text-white">
-                          {results.rhythm.tempo_bpm.toFixed(1)} <span className="text-lg text-gray-400">BPM</span>
+                          {results.rhythm.tempo_bpm?.toFixed(1) ?? 'N/A'} <span className="text-lg text-gray-400">BPM</span>
                         </div>
                       </div>
                     </div>

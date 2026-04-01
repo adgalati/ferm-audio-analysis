@@ -21,6 +21,7 @@ function StemPlaybackControls({
     isMuted,
     isInitialized,
     isLoading,
+    audioFile,
     playPause,
     skipBack,
     skipForward,
@@ -31,6 +32,14 @@ function StemPlaybackControls({
 
   // 'full' | 'vocals' | 'instrumental'
   const [activeMode, setActiveMode] = useState('full');
+
+  useEffect(() => {
+    if (audioFile?.path) {
+      if (audioFile.path === fullMixPath) setActiveMode('full');
+      else if (audioFile.path === vocalStemPath) setActiveMode('vocals');
+      else if (audioFile.path === instrumentalStemPath) setActiveMode('instrumental');
+    }
+  }, [audioFile, fullMixPath, vocalStemPath, instrumentalStemPath]);
 
   const formatTime = (time) => {
     const minutes = Math.floor(time / 60);

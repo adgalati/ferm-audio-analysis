@@ -290,10 +290,10 @@ function App() {
 
   return (
     <AudioPlayerProvider>
-      <div className="min-h-screen bg-gray-900 text-gray-100">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-800 via-gray-900 to-black text-gray-100">
+        <div className="w-full mx-auto px-6 lg:px-12 py-8 max-w-[96%] xl:max-w-[1800px]">
           <header className="mb-8">
-            <h1 className="text-4xl font-bold text-primary-400 mb-2 flex items-center gap-3">
+            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-400 drop-shadow-md mb-2 flex items-center gap-3">
               FERM Audio Analysis
               {appVersion && (
                 <span className="text-sm font-normal text-gray-500 bg-gray-800 px-2 py-1 rounded">
@@ -314,28 +314,28 @@ function App() {
             <div className="flex gap-2 relative">
               <button
                 onClick={() => setActiveMode('analysis')}
-                className={`px-4 py-2 text-sm border-b-2 transition-colors ${activeMode === 'analysis' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-300'
+                className={`px-4 py-2 text-sm border-b-2 transition-all duration-300 hover:text-white ${activeMode === 'analysis' ? 'border-cyan-400 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'border-transparent text-gray-400 hover:text-gray-300'
                   }`}
               >
                 Analysis
               </button>
               <button
                 onClick={() => setActiveMode('cloud')}
-                className={`px-4 py-2 text-sm border-b-2 transition-colors ${activeMode === 'cloud' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-300'
+                className={`px-4 py-2 text-sm border-b-2 transition-all duration-300 hover:text-white ${activeMode === 'cloud' ? 'border-cyan-400 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'border-transparent text-gray-400 hover:text-gray-300'
                   }`}
               >
                 Cloud Storage
               </button>
               <button
                 onClick={() => setActiveMode('reports')}
-                className={`px-4 py-2 text-sm border-b-2 transition-colors ${activeMode === 'reports' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-300'
+                className={`px-4 py-2 text-sm border-b-2 transition-all duration-300 hover:text-white ${activeMode === 'reports' ? 'border-cyan-400 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'border-transparent text-gray-400 hover:text-gray-300'
                   }`}
               >
                 Reports
               </button>
               <button
                 onClick={() => setActiveMode('training')}
-                className={`px-4 py-2 text-sm border-b-2 transition-colors ${activeMode === 'training' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-300'
+                className={`px-4 py-2 text-sm border-b-2 transition-all duration-300 hover:text-white ${activeMode === 'training' ? 'border-cyan-400 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'border-transparent text-gray-400 hover:text-gray-300'
                   }`}
               >
                 AI Training
@@ -345,8 +345,8 @@ function App() {
               <div className="relative">
                 <button
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className={`px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1 ${['ferm', 'faves', 'settings'].includes(activeMode)
-                    ? 'border-primary-500 text-primary-400'
+                  className={`px-4 py-2 text-sm border-b-2 transition-all duration-300 hover:text-white flex items-center gap-1 ${['ferm', 'faves', 'settings'].includes(activeMode)
+                    ? 'border-cyan-400 text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
                     : 'border-transparent text-gray-400 hover:text-gray-300'
                     }`}
                 >
@@ -429,7 +429,7 @@ function App() {
               {activeMode === 'analysis' && (
                 <>
                   {/* Awaiting file header and toggle */}
-                  <div className="card">
+                  <div className="bg-gray-800/60 backdrop-blur-md rounded-2xl p-6 border border-gray-600/50 shadow-[0_0_15px_rgba(56,189,248,0.15)] ring-1 ring-white/5 transition-all hover:border-cyan-500/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm text-gray-400">Awaiting file at</div>

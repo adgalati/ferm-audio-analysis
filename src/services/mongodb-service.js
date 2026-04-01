@@ -655,3 +655,90 @@ export async function migrateGenreConfidence(threshold = 0.10) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Override the official top genre label for a record.
+ * The original auto-detected genre is preserved in a `genreOverride` sub-document.
+ * Pass `tagIndex = null` or `tagIndex = -1` to clear the override and revert to auto-detected.
+ *
+ * @param {Object} payload
+ * @param {string} payload.clipName - clip name to look up
+ * @param {number|null} payload.tagIndex - index into genreTags to promote (null/-1 to clear)
+ * @returns {Promise<Object>} { success, topGenre?, topGenreWithStyle?, error? }
+ */
+export async function updateGenreOverride(payload) {
+  try {
+    if (!collection) throw new Error('MongoDB not connected');
+
+    const { clipName, tagIndex } = payload;
+    if (!clipName) throw new Error('clipName is required');
+
+    // Find the record
+    const doc = await collection.findOne(
+      { clipName: { $regex: `^${clipName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+    );
+    if (!doc) return { success: false, error: 'Record not found' };
+    if (!doc.genreTags || doc.genreTags.length === 0) {
+      return { success: false, error: 'Record has no genre tags' };
+    }
+
+    // Clearing the override — revert to auto-detected
+    if (tagIndex === null || tagIndex === -1) {
+      const autoTag = doc.genreTags[0];
+      const autoGenre = autoTag.score >= 0.10 ? autoTag.genre : 'Other';
+      const autoStyle = autoTag.score >= 0.10
+        ? (autoTag.subgenre ? `${autoTag.genre} - ${autoTag.subgenre}` : autoTag.genre)
+        : 'Other';
+
+      await collection.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            topGenre: autoGenre,
+            topGenreWithStyle: autoStyle,
+          },
+          $unset: { genreOverride: '' }
+        }
+      );
+      console.log(`[MongoDB] Genre override cleared for "${clipName}" → reverted to "${autoGenre}"`);
+      return { success: true, topGenre: autoGenre, topGenreWithStyle: autoStyle, overrideCleared: true };
+    }
+
+    // Validate tagIndex
+    if (tagIndex < 0 || tagIndex >= doc.genreTags.length) {
+      return { success: false, error: `tagIndex ${tagIndex} out of range (0-${doc.genreTags.length - 1})` };
+    }
+
+    const chosenTag = doc.genreTags[tagIndex];
+    const newTopGenre = chosenTag.genre;
+    const newTopGenreWithStyle = chosenTag.subgenre
+      ? `${chosenTag.genre} - ${chosenTag.subgenre}`
+      : chosenTag.genre;
+
+    // Preserve the original auto-detected values (only if not already overridden)
+    const originalTopGenre = doc.genreOverride?.originalTopGenre || doc.topGenre;
+    const originalTopGenreWithStyle = doc.genreOverride?.originalTopGenreWithStyle || doc.topGenreWithStyle;
+
+    await collection.updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          topGenre: newTopGenre,
+          topGenreWithStyle: newTopGenreWithStyle,
+          genreOverride: {
+            originalTopGenre,
+            originalTopGenreWithStyle,
+            chosenTagIndex: tagIndex,
+            overriddenAt: new Date()
+          }
+        }
+      }
+    );
+
+    console.log(`[MongoDB] Genre override for "${clipName}": "${originalTopGenre}" → "${newTopGenre}" (tag #${tagIndex})`);
+    return { success: true, topGenre: newTopGenre, topGenreWithStyle: newTopGenreWithStyle };
+  } catch (error) {
+    console.error('[MongoDB] updateGenreOverride error:', error);
+    return { success: false, error: error.message };
+  }
+}

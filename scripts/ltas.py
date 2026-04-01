@@ -59,7 +59,30 @@ def main():
 
     rel_db = {name: value - anchor for name, value in abs_db.items()}
 
-    print(json.dumps({'abs_db': abs_db, 'rel_db': rel_db}))
+    # High-res spectrum: 80 log-spaced points from 20 Hz to min(20 kHz, Nyquist)
+    nyquist = sr / 2.0
+    hi_limit = min(20000.0, nyquist - 1)
+    n_points = 80
+    hr_freqs = np.geomspace(20.0, hi_limit, n_points)
+
+    # Convert smoothed PSD to dB
+    psd_db = 10.0 * np.log10(np.maximum(psd_smoothed, 1e-12))
+
+    # Interpolate in log-frequency space for smooth results
+    log_freqs = np.log10(np.maximum(freqs, 1e-6))
+    log_hr = np.log10(hr_freqs)
+    hr_db = np.interp(log_hr, log_freqs, psd_db)
+
+    # Anchor high-res to same mid-band reference
+    hr_db_anchored = (hr_db - anchor).tolist()
+    hr_freqs_list = hr_freqs.tolist()
+
+    print(json.dumps({
+        'abs_db': abs_db,
+        'rel_db': rel_db,
+        'highres_frequencies': hr_freqs_list,
+        'highres_db': hr_db_anchored,
+    }))
 
 
 if __name__ == '__main__':

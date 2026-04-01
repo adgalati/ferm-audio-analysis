@@ -506,7 +506,7 @@ function UmapScatterPlot({ highlightId, onTrackClick, sourceTypeFilter = 'all', 
             )}
 
             {/* Chart */}
-            <div className="relative bg-gray-900/50 rounded-lg border border-gray-700 p-2" style={{ height: compact ? 350 : 480 }}>
+            <div className="relative bg-gray-900/50 rounded-lg border border-gray-700 p-2" style={{ height: compact ? 550 : 750 }}>
                 <canvas ref={canvasRef} />
                 {/* Zoom hint overlay */}
                 <div className="absolute bottom-3 left-3 text-[10px] text-gray-500 pointer-events-none">

@@ -33,17 +33,17 @@ export function LoudnessDisplay({ loudness }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="text-sm text-blue-600 font-medium">Integrated LUFS</div>
-              <div className="text-2xl font-bold text-blue-800">{global.input_i.toFixed(1)}</div>
+              <div className="text-2xl font-bold text-blue-800">{global.input_i?.toFixed(1) ?? 'N/A'}</div>
               <div className="text-xs text-blue-500">Target: -14 LUFS</div>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
               <div className="text-sm text-green-600 font-medium">Loudness Range</div>
-              <div className="text-2xl font-bold text-green-800">{global.input_lra.toFixed(1)}</div>
+              <div className="text-2xl font-bold text-green-800">{global.input_lra?.toFixed(1) ?? 'N/A'}</div>
               <div className="text-xs text-green-500">EBU LRA</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
               <div className="text-sm text-purple-600 font-medium">True Peak</div>
-              <div className="text-2xl font-bold text-purple-800">{global.input_tp.toFixed(1)}</div>
+              <div className="text-2xl font-bold text-purple-800">{global.input_tp?.toFixed(1) ?? 'N/A'}</div>
               <div className="text-xs text-purple-500">dBTP</div>
             </div>
           </div>

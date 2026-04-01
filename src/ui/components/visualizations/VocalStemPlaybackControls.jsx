@@ -11,6 +11,7 @@ function VocalStemPlaybackControls({ className = '', vocalStemPath = null, stems
     isMuted,
     isInitialized,
     isLoading,
+    audioFile,
     playPause,
     skipBack,
     skipForward,
@@ -20,6 +21,13 @@ function VocalStemPlaybackControls({ className = '', vocalStemPath = null, stems
   } = useAudioPlayer();
 
   const [isVocalStemMode, setIsVocalStemMode] = useState(false);
+
+  useEffect(() => {
+    if (audioFile?.path) {
+      if (audioFile.path === vocalStemPath) setIsVocalStemMode(true);
+      else if (audioFile.path === fullMixPath) setIsVocalStemMode(false);
+    }
+  }, [audioFile, vocalStemPath, fullMixPath]);
 
   const formatTime = (time) => {
     const minutes = Math.floor(time / 60);

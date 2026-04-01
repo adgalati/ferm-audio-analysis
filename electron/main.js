@@ -676,6 +676,17 @@ ipcMain.handle('mongodb:migrate-genre-confidence', async (event) => {
   }
 });
 
+ipcMain.handle('mongodb:update-genre-override', async (event, payload) => {
+  try {
+    if (!mongodbService) mongodbService = await import('../src/services/mongodb-service.js');
+    if (!mongodbService.isConnected()) return { success: false, error: 'Not connected to MongoDB' };
+    return await mongodbService.updateGenreOverride(payload);
+  } catch (error) {
+    console.error('[MongoDB IPC] update-genre-override error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // --- Report / Infographic Generation ---
 ipcMain.handle('report:generate-infographic', async (event, { dateFrom, dateTo, categories, aspectRatio, sourceType, userPrompt }) => {
   try {
