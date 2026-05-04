@@ -102,6 +102,7 @@ function Sparkline({ values = [], label, color = '#22d3ee', subtitle = null, ful
 
 export default function SpectralDisplay({ spectralData, detectedGenre }) {
   const [activeGenre, setActiveGenre] = useState(() => spectralData?.genreFit?.selectedGenre || detectedGenre || spectralData?.genreFit?.bestMatch);
+  const [showTooltips, setShowTooltips] = useState(false);
 
   const genreScores = spectralData?.genreFit?.scores || {};
   const availableGenres = useMemo(() => {
@@ -359,6 +360,7 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
         }
       },
       tooltip: {
+        enabled: showTooltips,
         callbacks: {
           label: (context) => {
             const freq = context.parsed.x;
@@ -417,7 +419,7 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
         }
       }
     }
-  }), [chartFrequencyRange]);
+  }), [chartFrequencyRange, showTooltips]);
 
   const handleGenreSelect = (genre) => {
     setActiveGenre(genre);
@@ -500,9 +502,20 @@ export default function SpectralDisplay({ spectralData, detectedGenre }) {
       </section>
 
       <section className="bg-gray-900/70 border border-gray-800/60 rounded-xl p-6 shadow-inner">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-cyan-400" aria-hidden="true" />
-          <h3 className="text-lg font-semibold text-slate-100">Tonal Balance Comparison</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-cyan-400" aria-hidden="true" />
+            <h3 className="text-lg font-semibold text-slate-100">Tonal Balance Comparison</h3>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300 hover:text-white transition-colors duration-200">
+            <input 
+              type="checkbox" 
+              className="rounded border-gray-600 bg-gray-800 text-indigo-500 shadow-sm focus:border-indigo-400 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
+              checked={showTooltips} 
+              onChange={(e) => setShowTooltips(e.target.checked)} 
+            />
+            Show Hover Details
+          </label>
         </div>
         <div className="w-full h-[75vh] min-h-[500px]">
           <Line data={tonalChartData} options={tonalChartOptions} plugins={[bandEdgesPlugin, bandLabelPlugin]} />

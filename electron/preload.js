@@ -73,4 +73,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('umap-progress', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('umap-progress');
   },
+
+  // Genre Pie Chart Overlay
+  openOverlay: (sessionData) => ipcRenderer.invoke('overlay:open', { sessionData }),
+  closeOverlay: () => ipcRenderer.invoke('overlay:close'),
+  updateOverlayData: (sessionData) => ipcRenderer.invoke('overlay:update-data', sessionData),
+  onOverlayClosed: (callback) => {
+    ipcRenderer.on('overlay:closed', () => callback());
+    return () => ipcRenderer.removeAllListeners('overlay:closed');
+  },
+  onOverlayRequestData: (callback) => {
+    ipcRenderer.on('overlay:request-data', () => callback());
+    return () => ipcRenderer.removeAllListeners('overlay:request-data');
+  },
 });

@@ -75,6 +75,9 @@ function ReportGeneratorPanel() {
     // User prompt
     const [userPrompt, setUserPrompt] = useState('');
 
+    // Selected model
+    const [selectedModel, setSelectedModel] = useState('gemini'); // 'gemini' | 'gpt'
+
     // Library State
     const [viewMode, setViewMode] = useState('generator'); // 'generator' | 'library'
     const [savedReports, setSavedReports] = useState([]);
@@ -119,7 +122,8 @@ function ReportGeneratorPanel() {
                 categories: Array.from(selectedCategories),
                 aspectRatio,
                 sourceType: sourceType === 'all' ? null : sourceType,
-                userPrompt: userPrompt.trim() || null
+                userPrompt: userPrompt.trim() || null,
+                model: selectedModel
             });
 
             if (result.success) {
@@ -158,7 +162,8 @@ function ReportGeneratorPanel() {
                     categories: Array.from(selectedCategories),
                     aspectRatio,
                     sourceType,
-                    userPrompt
+                    userPrompt,
+                    model: selectedModel
                 }
             };
 
@@ -226,6 +231,7 @@ function ReportGeneratorPanel() {
                     if (report.options.aspectRatio) setAspectRatio(report.options.aspectRatio);
                     if (report.options.sourceType) setSourceType(report.options.sourceType);
                     setUserPrompt(report.options.userPrompt || '');
+                    if (report.options.model) setSelectedModel(report.options.model);
                 }
 
                 setViewMode('generator');
@@ -288,7 +294,7 @@ function ReportGeneratorPanel() {
 
                         <div className="flex items-center gap-2 text-xs text-gray-500 self-center">
                             <ImageIcon className="w-4 h-4" />
-                            Powered by Gemini AI
+                            Powered by {selectedModel === 'gpt' ? 'OpenAI GPT' : 'Gemini AI'}
                         </div>
                     </div>
                 </div>
@@ -508,8 +514,30 @@ function ReportGeneratorPanel() {
                                 onChange={(e) => setUserPrompt(e.target.value)}
                                 placeholder="e.g. Use a horizontal bar chart for genres, put the key signature in a circle of fifths diagram…"
                                 rows={3}
-                                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-yellow-500 resize-none"
+                                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-yellow-500 resize-none mb-4"
                             />
+
+                            <h3 className="text-sm font-semibold text-gray-200 mb-3 mt-4 flex items-center gap-2">
+                                <ImageIcon className="w-4 h-4 text-pink-400" />
+                                Image Model
+                            </h3>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {[
+                                    { value: 'gemini', label: 'Gemini (Nano Banana Pro)' },
+                                    { value: 'gpt', label: 'OpenAI (GPT Image 2)' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setSelectedModel(opt.value)}
+                                        className={`px-2 py-2 rounded text-center transition-all text-xs font-medium ${selectedModel === opt.value
+                                            ? 'bg-pink-900/40 border border-pink-600/60 text-pink-200'
+                                            : 'bg-gray-800/50 border border-gray-700/30 text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Generate Button */}

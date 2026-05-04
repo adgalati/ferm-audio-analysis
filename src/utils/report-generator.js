@@ -481,3 +481,59 @@ export function generateReportFilename(audioPath) {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
     return `${baseName}_full_analysis_${timestamp}.json`;
 }
+
+/**
+ * Generate an infographic using OpenAI's image generation API (DALL-E / GPT)
+ *
+ * @param {string} promptText - The prompt describing the infographic
+ * @param {string} apiKey - OpenAI API key
+ * @param {Object} options - Options containing model and other generation params
+ * @returns {Promise<Object>} { success, imageBase64?, mimeType?, error? }
+ */
+export async function generateOpenAIInfographic(promptText, apiKey, options = {}) {
+    if (!apiKey) {
+        return { success: false, error: 'OPENAI_API_KEY is not configured.' };
+    }
+
+    try {
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-image-2',
+                prompt: promptText,
+                n: 1,
+                size: '1024x1024',
+                output_format: 'png',
+                quality: 'medium'
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return { success: false, error: data.error?.message || 'OpenAI API Error' };
+        }
+
+        // gpt-image-2 returns base64 data by default
+        if (data.data && data.data[0] && data.data[0].b64_json) {
+            console.log('[OpenAI Report] Infographic generated successfully');
+            return {
+                success: true,
+                imageBase64: data.data[0].b64_json,
+                mimeType: 'image/png'
+            };
+        }
+
+        return {
+            success: false,
+            error: 'No image data returned from OpenAI.'
+        };
+    } catch (err) {
+        console.error('[OpenAI Report] Request failed:', err);
+        return { success: false, error: err.message };
+    }
+}

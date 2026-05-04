@@ -1,6 +1,6 @@
 {
   "name": "ferm-audio-analysis",
-  "version": "1.5.1",
+  "version": "1.6.2",
   "private": true,
   "type": "module",
   "description": "Windows-native Electron + React desktop app for comprehensive audio analysis, featuring stem separation (Demucs), genre classification (MAEST), and musicality scoring. Powered by Vamp plugins, FFmpeg, and openSMILE.",
@@ -90,7 +90,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/RealFERM_logo.ico"
     },
     "nsis": {
       "oneClick": false,

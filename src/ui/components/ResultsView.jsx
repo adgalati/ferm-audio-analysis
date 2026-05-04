@@ -27,7 +27,7 @@ import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 /** Genre confidence gate — tracks below this threshold are categorized as "Other" */
 const GENRE_CONFIDENCE_THRESHOLD = 0.10;
 
-function ResultsView({ results, audioFile }) {
+function ResultsView({ results, audioFile, onGenreOverride }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isFavorite, setIsFavorite] = useState(false);
   const [isMarkingFavorite, setIsMarkingFavorite] = useState(false);
@@ -382,7 +382,11 @@ function ResultsView({ results, audioFile }) {
           )}
 
           {activeTab === 'autotagging' && results.autotagging && (
-            <AutoTagDisplay autotagging={results.autotagging} audioFile={audioFile} />
+            <AutoTagDisplay
+              autotagging={results.autotagging}
+              audioFile={audioFile}
+              onGenreOverride={onGenreOverride}
+            />
           )}
 
           {activeTab === 'search' && (

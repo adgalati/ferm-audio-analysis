@@ -58,15 +58,23 @@ export function aggregateInsights(records, selectedCategories = [], userDateRang
     console.log(`[GeminiReport] Record date range: ${computedEarliest?.toISOString()} — ${computedLatest?.toISOString()}`);
     console.log(`[GeminiReport] User-selected range: ${userDateRange.dateFrom || 'all'} — ${userDateRange.dateTo || 'all'}`);
 
+    // Helper to safely parse user date strings into local time dates to prevent timezone shift
+    const parseLocalIso = (dateStr) => {
+        if (!dateStr) return null;
+        const ymd = dateStr.split('T')[0];
+        const [y, m, d] = ymd.split('-');
+        return new Date(y, m - 1, d).toISOString();
+    };
+
     // Use user-selected range for display, fall back to computed range
     if (userDateRange.dateFrom) {
-        insights.dateRange.earliest = new Date(userDateRange.dateFrom).toISOString();
+        insights.dateRange.earliest = parseLocalIso(userDateRange.dateFrom);
     } else if (computedEarliest) {
         insights.dateRange.earliest = computedEarliest.toISOString();
     }
 
     if (userDateRange.dateTo) {
-        insights.dateRange.latest = new Date(userDateRange.dateTo).toISOString();
+        insights.dateRange.latest = parseLocalIso(userDateRange.dateTo);
     } else if (computedLatest) {
         insights.dateRange.latest = computedLatest.toISOString();
     }
@@ -363,7 +371,7 @@ export async function generateInfographic(insights, logoBase64, apiKey, options 
 // Prompt Builder
 // ---------------------------------------------------------------------------
 
-function buildPrompt(insights, aspectRatio = '9:16') {
+export function buildPrompt(insights, aspectRatio = '9:16') {
     const lines = [
         'Generate a visually stunning infographic image for the following audio analysis report data.',
         `Total Submissions: ${insights.totalTracks}`,

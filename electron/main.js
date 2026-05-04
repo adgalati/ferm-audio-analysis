@@ -19,6 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow;
+let overlayWindow = null;
 let currentAnalysis = null;
 let currentAbortController = null;
 let fileWatcher = null;
@@ -79,6 +80,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
+    icon: path.join(__dirname, app.isPackaged ? '../dist/RealFERM_logo.ico' : '../public/RealFERM_logo.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -101,6 +103,10 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
+    // Close overlay if open
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+    }
     mainWindow = null;
   });
 }
@@ -687,13 +693,48 @@ ipcMain.handle('mongodb:update-genre-override', async (event, payload) => {
   }
 });
 
+// --- Affinity / AI Training Label IPC ---
+ipcMain.handle('mongodb:update-affinity-label', async (event, payload) => {
+  try {
+    if (!mongodbService) mongodbService = await import('../src/services/mongodb-service.js');
+    if (!mongodbService.isConnected()) return { success: false, error: 'Not connected to MongoDB' };
+    return await mongodbService.updateAffinityLabel(payload.id, payload.affinityLabel);
+  } catch (error) {
+    console.error('[MongoDB IPC] update-affinity-label error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('mongodb:update-ai-generated-label', async (event, payload) => {
+  try {
+    if (!mongodbService) mongodbService = await import('../src/services/mongodb-service.js');
+    if (!mongodbService.isConnected()) return { success: false, error: 'Not connected to MongoDB' };
+    return await mongodbService.updateAiGeneratedLabel(payload.id, payload.aiGeneratedLabel);
+  } catch (error) {
+    console.error('[MongoDB IPC] update-ai-generated-label error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('mongodb:query-affinity-records', async (event, payload) => {
+  try {
+    if (!mongodbService) mongodbService = await import('../src/services/mongodb-service.js');
+    if (!mongodbService.isConnected()) return { success: false, records: [], total: 0, error: 'Not connected to MongoDB' };
+    return await mongodbService.queryRecordsForAffinity(payload);
+  } catch (error) {
+    console.error('[MongoDB IPC] query-affinity-records error:', error);
+    return { success: false, records: [], total: 0, error: error.message };
+  }
+});
+
 // --- Report / Infographic Generation ---
-ipcMain.handle('report:generate-infographic', async (event, { dateFrom, dateTo, categories, aspectRatio, sourceType, userPrompt }) => {
+ipcMain.handle('report:generate-infographic', async (event, { dateFrom, dateTo, categories, aspectRatio, sourceType, userPrompt, model }) => {
   try {
     const env = loadWindowsEnv();
-    const apiKey = env.GEMINI_API_KEY;
+    const isGpt = model === 'gpt';
+    const apiKey = isGpt ? env.OPENAI_API_KEY : env.GEMINI_API_KEY;
     if (!apiKey) {
-      return { success: false, error: 'GEMINI_API_KEY is not configured in windows.env' };
+      return { success: false, error: `${isGpt ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'} is not configured in windows.env` };
     }
 
     // Ensure MongoDB is available
@@ -721,10 +762,11 @@ ipcMain.handle('report:generate-infographic', async (event, { dateFrom, dateTo, 
       return { success: false, error: 'No records found in the selected date range.' };
     }
 
-    console.log(`[Report IPC] Found ${queryResult.records.length} records for infographic (sourceType: ${sourceType || 'all'})`);
+    console.log(`[Report IPC] Found ${queryResult.records.length} records for infographic (sourceType: ${sourceType || 'all'}, model: ${model})`);
 
     // Aggregate insights — pass user-selected date range for display on the infographic
-    const { aggregateInsights, generateInfographic } = await import('../src/services/gemini-report-service.js');
+    const { aggregateInsights, generateInfographic, buildPrompt } = await import('../src/services/gemini-report-service.js');
+    const { generateOpenAIInfographic } = await import('../src/utils/report-generator.js');
     const insights = aggregateInsights(queryResult.records, categories || [], { dateFrom, dateTo });
 
     // Load logo as base64
@@ -738,12 +780,25 @@ ipcMain.handle('report:generate-infographic', async (event, { dateFrom, dateTo, 
       console.warn('[Report IPC] Could not load logo:', logoErr.message);
     }
 
-    // Generate infographic via Gemini
-    const result = await generateInfographic(insights, logoBase64, apiKey, {
-      aspectRatio: aspectRatio || '9:16',
-      imageSize: '2K',
-      userPrompt: userPrompt || null
-    });
+    let result;
+    if (isGpt) {
+      // Generate using OpenAI
+      let promptText = buildPrompt(insights, aspectRatio || '9:16');
+      if (userPrompt) {
+        promptText += `\n\nAdditional user instructions:\n${userPrompt}`;
+      }
+      result = await generateOpenAIInfographic(promptText, apiKey, {
+        aspectRatio: aspectRatio || '9:16',
+      });
+    } else {
+      // Generate infographic via Gemini
+      result = await generateInfographic(insights, logoBase64, apiKey, {
+        aspectRatio: aspectRatio || '9:16',
+        imageSize: '2K',
+        userPrompt: userPrompt || null
+      });
+    }
+
     if (result.success) {
       return { success: true, imageBase64: result.imageBase64, mimeType: result.mimeType, insights };
     } else {
@@ -1133,6 +1188,91 @@ ipcMain.handle('training:trainClassifier', async (event, data = {}) => {
       }
     });
   });
+});
+
+// --- Genre Pie Chart Overlay IPC ---
+ipcMain.handle('overlay:open', async (event, { sessionData }) => {
+  try {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.focus();
+      overlayWindow.webContents.send('overlay:session-update', sessionData || []);
+      return { success: true, alreadyOpen: true };
+    }
+
+    overlayWindow = new BrowserWindow({
+      width: 400,
+      height: 400,
+      transparent: true,
+      frame: false,
+      title: 'FERM Genre Pie Chart Overlay',
+      alwaysOnTop: true,
+      resizable: false,
+      skipTaskbar: false,
+      icon: path.join(__dirname, app.isPackaged ? '../dist/RealFERM_logo.ico' : '../public/RealFERM_logo.ico'),
+      webPreferences: {
+        preload: path.join(__dirname, 'overlay-preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+      backgroundColor: '#00000000',
+    });
+
+    // Load the overlay page
+    if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+      overlayWindow.loadURL('http://localhost:5173/overlay.html');
+    } else {
+      overlayWindow.loadFile(path.join(__dirname, '../dist/overlay.html'));
+    }
+
+    // Send initial data once ready
+    overlayWindow.webContents.once('did-finish-load', () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('overlay:session-update', sessionData || []);
+      }
+    });
+
+    // Notify main renderer when overlay is closed
+    overlayWindow.on('closed', () => {
+      overlayWindow = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('overlay:closed');
+      }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Overlay IPC] open error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('overlay:close', async () => {
+  try {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('overlay:update-data', async (event, sessionData) => {
+  try {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('overlay:session-update', sessionData || []);
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle overlay requesting initial data (forwarded to main renderer)
+ipcMain.on('overlay:request-data', (event) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('overlay:request-data');
+  }
 });
 
 // App lifecycle

@@ -742,3 +742,222 @@ export async function updateGenreOverride(payload) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Update the affinity training label for a record.
+ * This is the raw precursor label (0–4) used to train the FERM Affinity classifier.
+ * NOT the final fermAffinity score — that name is reserved for classifier output.
+ *
+ * @param {string} id - Record _id
+ * @param {number|null} affinityLabel - Integer 0–4, or null to clear
+ * @returns {Promise<Object>} { success, modifiedCount, error? }
+ */
+export async function updateAffinityLabel(id, affinityLabel) {
+  try {
+    if (!collection) throw new Error('MongoDB not connected');
+    const { ObjectId } = await import('mongodb');
+
+    let update;
+    if (affinityLabel === null || affinityLabel === undefined) {
+      update = { $unset: { affinityLabel: '', affinityLabeledAt: '' } };
+    } else {
+      const val = parseInt(affinityLabel, 10);
+      if (isNaN(val) || val < 0 || val > 4) {
+        return { success: false, error: 'affinityLabel must be an integer 0–4 or null' };
+      }
+      update = { $set: { affinityLabel: val, affinityLabeledAt: new Date() } };
+    }
+
+    const result = await collection.updateOne({ _id: new ObjectId(id) }, update);
+    return { success: true, modifiedCount: result.modifiedCount };
+  } catch (error) {
+    console.error('[MongoDB] updateAffinityLabel error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Update the AI-generated training label for a record.
+ * Binary: 0 = not AI, 1 = AI-generated (or very likely).
+ * NOT the final isAiGenerated classifier output — that name is reserved.
+ *
+ * @param {string} id - Record _id
+ * @param {number|null} aiGeneratedLabel - 0 or 1, or null to clear
+ * @returns {Promise<Object>} { success, modifiedCount, error? }
+ */
+export async function updateAiGeneratedLabel(id, aiGeneratedLabel) {
+  try {
+    if (!collection) throw new Error('MongoDB not connected');
+    const { ObjectId } = await import('mongodb');
+
+    let update;
+    if (aiGeneratedLabel === null || aiGeneratedLabel === undefined) {
+      update = { $unset: { aiGeneratedLabel: '', aiGeneratedLabeledAt: '' } };
+    } else {
+      const val = parseInt(aiGeneratedLabel, 10);
+      if (val !== 0 && val !== 1) {
+        return { success: false, error: 'aiGeneratedLabel must be 0, 1, or null' };
+      }
+      update = { $set: { aiGeneratedLabel: val, aiGeneratedLabeledAt: new Date() } };
+    }
+
+    const result = await collection.updateOne({ _id: new ObjectId(id) }, update);
+    return { success: true, modifiedCount: result.modifiedCount };
+  } catch (error) {
+    console.error('[MongoDB] updateAiGeneratedLabel error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Query records for affinity / AI-generated labeling.
+ * Always filters to records that have an embedding (embeddingPath is non-null).
+ *
+ * @param {Object} options
+ * @param {string}  [options.clipNameSearch]     - text search on clipName
+ * @param {string}  [options.genreFilter]        - filter by topGenre
+ * @param {string}  [options.sortBy='date']      - sort field
+ * @param {number}  [options.sortOrder=-1]       - 1 = asc, -1 = desc
+ * @param {number}  [options.limit=50]
+ * @param {number}  [options.skip=0]
+ * @param {boolean} [options.labeledOnly]        - true = only affinity-labeled, false = unlabeled only, null/undefined = all
+ * @param {number}  [options.affinityValue]      - filter to a specific affinityLabel value (0–4)
+ * @param {boolean} [options.excludeAiGenerated] - when true, exclude records where aiGeneratedLabel === 1
+ * @param {boolean} [options.aiLabeledOnly]      - true = only AI-labeled, false = AI-unlabeled only, null = all
+ * @param {number}  [options.aiGeneratedValue]   - filter to a specific aiGeneratedLabel value (0 or 1)
+ * @returns {Promise<Object>} { success, records, total, stats, error? }
+ */
+export async function queryRecordsForAffinity(options = {}) {
+  try {
+    if (!collection) throw new Error('MongoDB not connected');
+
+    const {
+      clipNameSearch = null,
+      genreFilter = null,
+      sortBy = 'date',
+      sortOrder = -1,
+      limit = 50,
+      skip = 0,
+      labeledOnly = null,
+      affinityValue = null,
+      excludeAiGenerated = false,
+      aiLabeledOnly = null,
+      aiGeneratedValue = null
+    } = options;
+
+    // Base: must have an embedding
+    const filter = {
+      embeddingPath: { $exists: true, $ne: null }
+    };
+
+    // Exclude period-marker entries
+    filter.isPeriodEntry = { $ne: true };
+
+    // Clip name search
+    if (clipNameSearch) {
+      filter.clipName = { $regex: clipNameSearch, $options: 'i' };
+    }
+
+    // Genre filter
+    if (genreFilter) {
+      filter.topGenre = genreFilter;
+    }
+
+    // Affinity label filters
+    if (affinityValue !== null && affinityValue !== undefined) {
+      filter.affinityLabel = parseInt(affinityValue, 10);
+    } else if (labeledOnly === true) {
+      filter.affinityLabel = { $exists: true, $ne: null };
+    } else if (labeledOnly === false) {
+      filter.$or = filter.$or || [];
+      filter.$or.push(
+        { affinityLabel: { $exists: false } },
+        { affinityLabel: null }
+      );
+    }
+
+    // AI-generated label filters
+    if (aiGeneratedValue !== null && aiGeneratedValue !== undefined) {
+      filter.aiGeneratedLabel = parseInt(aiGeneratedValue, 10);
+    } else if (aiLabeledOnly === true) {
+      filter.aiGeneratedLabel = { $exists: true, $ne: null };
+    } else if (aiLabeledOnly === false) {
+      // Unlabeled AI records
+      const aiOrConditions = [
+        { aiGeneratedLabel: { $exists: false } },
+        { aiGeneratedLabel: null }
+      ];
+      if (filter.$or) {
+        // Need to combine with $and since we already have $or
+        const existingOr = filter.$or;
+        delete filter.$or;
+        filter.$and = [
+          { $or: existingOr },
+          { $or: aiOrConditions }
+        ];
+      } else {
+        filter.$or = aiOrConditions;
+      }
+    }
+
+    // Exclude AI-generated tracks from affinity training queries
+    if (excludeAiGenerated) {
+      filter.aiGeneratedLabel = { $ne: 1 };
+    }
+
+    // Sort
+    const sort = {};
+    const sortField = sortBy === 'genre' ? 'topGenre' : sortBy;
+    sort[sortField] = sortOrder;
+
+    // Execute
+    const records = await collection
+      .find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const total = await collection.countDocuments(filter);
+
+    // Gather labeling stats (on the base embedding filter only, for the stats banner)
+    const baseFilter = {
+      embeddingPath: { $exists: true, $ne: null },
+      isPeriodEntry: { $ne: true }
+    };
+    const [totalEmbedded, affinityLabeledCount, aiLabeledCount, aiPositiveCount] = await Promise.all([
+      collection.countDocuments(baseFilter),
+      collection.countDocuments({ ...baseFilter, affinityLabel: { $exists: true, $ne: null } }),
+      collection.countDocuments({ ...baseFilter, aiGeneratedLabel: { $exists: true, $ne: null } }),
+      collection.countDocuments({ ...baseFilter, aiGeneratedLabel: 1 })
+    ]);
+
+    // Distribution of affinity labels 0–4
+    const affinityDistribution = {};
+    for (let v = 0; v <= 4; v++) {
+      affinityDistribution[v] = await collection.countDocuments({ ...baseFilter, affinityLabel: v });
+    }
+
+    return {
+      success: true,
+      records: records.map(doc => ({
+        ...doc,
+        _id: doc._id.toString()
+      })),
+      total,
+      stats: {
+        totalEmbedded,
+        affinityLabeled: affinityLabeledCount,
+        affinityUnlabeled: totalEmbedded - affinityLabeledCount,
+        affinityDistribution,
+        aiLabeled: aiLabeledCount,
+        aiUnlabeled: totalEmbedded - aiLabeledCount,
+        aiPositive: aiPositiveCount,
+        aiNegative: aiLabeledCount - aiPositiveCount
+      }
+    };
+  } catch (error) {
+    console.error('[MongoDB] queryRecordsForAffinity error:', error);
+    return { success: false, records: [], total: 0, error: error.message };
+  }
+}

@@ -23,12 +23,12 @@ function GenreExplainModal({ open, onClose, loading, error, data }) {
         {!loading && !error && data && (
           <div className="space-y-3">
             <div className="text-white font-medium">{data.title}</div>
-            {Array.isArray(data.bullets) && data.bullets.length > 0 && (
-              <ul className="list-disc list-inside space-y-1 text-sm text-gray-200">
-                {data.bullets.map((b, i) => (
-                  <li key={i}>{b}</li>
+            {Array.isArray(data.paragraphs) && data.paragraphs.length > 0 && (
+              <div className="space-y-2 text-sm text-gray-200">
+                {data.paragraphs.map((p, i) => (
+                  <p key={i}>{p}</p>
                 ))}
-              </ul>
+              </div>
             )}
             {data.summary && (
               <p className="text-sm text-gray-400">{data.summary}</p>
@@ -37,7 +37,7 @@ function GenreExplainModal({ open, onClose, loading, error, data }) {
               <button
                 className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm text-gray-100"
                 onClick={() => {
-                  const text = `${data.title}\n\n- ${data.bullets?.join('\n- ')}\n\n${data.summary}`;
+                  const text = `${data.title}\n\n${data.paragraphs?.join('\n\n')}\n\n${data.summary}`;
                   navigator.clipboard.writeText(text);
                 }}
               >Copy</button>

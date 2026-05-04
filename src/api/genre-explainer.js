@@ -37,13 +37,14 @@ function extractJsonFromCodeFence(text) {
 const memoryCache = new Map();
 
 function cacheKey(genre, subgenre) {
-  return `${(genre||'').trim().toLowerCase()}|${(subgenre||'').trim().toLowerCase()}`;
+  return `${(genre || '').trim().toLowerCase()}|${(subgenre || '').trim().toLowerCase()}`;
 }
 
 export async function explainGenre({ genre, subgenre }) {
   if (!genre && !subgenre) throw new Error('Missing genre/subgenre');
   const key = cacheKey(genre, subgenre);
-  if (memoryCache.has(key)) return memoryCache.get(key);
+  // Cache disabled during testing — re-enable when responses are stable
+  // if (memoryCache.has(key)) return memoryCache.get(key);
 
   // Debug: verify env file presence and API key availability
   try {
@@ -51,7 +52,7 @@ export async function explainGenre({ genre, subgenre }) {
     const hasEnvFile = fs.existsSync(envPath);
     // eslint-disable-next-line no-console
     console.debug(`[GenreExplainer] windows.env present: ${hasEnvFile} at ${envPath}`);
-  } catch (_) {}
+  } catch (_) { }
 
   const env = loadWindowsEnv();
   const apiKey = env.OPENAI_API_KEY;
@@ -61,22 +62,28 @@ export async function explainGenre({ genre, subgenre }) {
 
   const title = subgenre ? `${genre} - ${subgenre}` : genre;
 
-  // Build prompt
-  const system = 'You are a music analysis expert for a live stream. Be concise and practical.';
+  // Build prompt — outcome-first style per GPT-5.5 guidance
+  const system = 'You are a concise music analysis expert. Respond only with the requested JSON. No preamble, no markdown fences.';
   const exampleTitle = JSON.stringify(title);
-  const user = `Explain the musical characteristics typically associated with ${title}.
-Include textures, instruments, rhythm/harmony patterns, production traits, and notable artist or band examples associated with ${title}.
-Return ONLY strict JSON (no backticks, no extra commentary) with fields: {"title": ${exampleTitle}, "bullets": ["..."], "summary": "..."}. Max 7 bullets, avoid fluff.`;
+  const user = `Write exactly 3 short paragraphs about the musical style "${title}".
+
+Paragraph 1: Describe the characteristic sounds, textures, and instruments used in this style.
+Paragraph 2: Describe the production and audio-engineering techniques that define this style.
+Paragraph 3: Give a brief history of the style and list the most prominent artists or bands associated with it.
+
+If the style includes an abbreviation, make sure to include the full name of the style in the first paragraph spelled out; ex. "EDM" = "Electronic Dance Music".
+Each paragraph must be 2-4 sentences. No bullet points, no headers.
+Return ONLY strict JSON with fields: {"title": ${exampleTitle}, "paragraphs": ["...", "...", "..."], "summary": "one-sentence summary"}.`;
 
   const body = {
-    model: 'gpt-5-mini',
+    model: 'gpt-5.5',
     instructions: system,
     input: user,
-    max_output_tokens: 1024, // Start with sufficient tokens to avoid retries
-    reasoning: { effort: 'low' }, // Reduce reasoning overhead
-    text: { 
+    max_output_tokens: 1500,
+    reasoning: { effort: 'medium' }, // GPT-5.5 recommended default
+    text: {
       format: { type: 'json_object' },
-      verbosity: 'low' // Reduce verbosity to save tokens
+      verbosity: 'low'
     }
   };
 
@@ -118,7 +125,7 @@ Return ONLY strict JSON (no backticks, no extra commentary) with fields: {"title
     const snippet = dump.length > 1200 ? dump.slice(0, 1200) + '…' : dump;
     // eslint-disable-next-line no-console
     console.debug('[GenreExplainer] OpenAI raw response (truncated):', snippet);
-  } catch (_) {}
+  } catch (_) { }
 
   // Prepare variables for content extraction across branches
   let content = '';
@@ -137,7 +144,7 @@ Return ONLY strict JSON (no backticks, no extra commentary) with fields: {"title
     if (typeof j?.output_text === 'string' && j.output_text.trim()) return { content: j.output_text, source: 'output_text' };
     if (typeof j?.content?.[0]?.text === 'string' && j.content[0].text.trim()) return { content: j.content[0].text, source: 'content[0].text' };
     if (typeof j?.output?.[0]?.content?.[0]?.text === 'string' && j.output[0].content[0].text.trim()) return { content: j.output[0].content[0].text, source: 'output[0].content[0].text' };
-    
+
     // Check for output array with message type content (most common for Responses API)
     if (Array.isArray(j?.output)) {
       for (const outputItem of j.output) {
@@ -150,10 +157,10 @@ Return ONLY strict JSON (no backticks, no extra commentary) with fields: {"title
         }
       }
     }
-    
+
     return { content: '', source: '' };
   }
-  
+
   const picked = pickContent(json);
   content = picked.content;
   contentSource = picked.source;
@@ -192,12 +199,12 @@ Return ONLY strict JSON (no backticks, no extra commentary) with fields: {"title
     if (!parsed) {
       // eslint-disable-next-line no-console
       console.warn('[GenreExplainer] JSON.parse failed on model output; falling back to heuristic parsing');
-      // Fallback: convert lines to bullets and summary
+      // Fallback: split content into paragraph-like chunks
       const lines = content.split('\n').map(s => s.trim()).filter(Boolean);
       parsed = {
         title,
-        bullets: lines.slice(0, 7),
-        summary: lines.slice(0, 2).join(' ')
+        paragraphs: lines.slice(0, 3),
+        summary: lines[0] || ''
       };
     }
   }
@@ -205,11 +212,12 @@ Return ONLY strict JSON (no backticks, no extra commentary) with fields: {"title
   // Minimal normalization
   const result = {
     title: parsed.title || title,
-    bullets: Array.isArray(parsed.bullets) ? parsed.bullets.slice(0, 7) : [],
+    paragraphs: Array.isArray(parsed.paragraphs) ? parsed.paragraphs.slice(0, 3) : [],
     summary: parsed.summary || ''
   };
 
-  memoryCache.set(key, result);
+  // Cache disabled during testing — re-enable when responses are stable
+  // memoryCache.set(key, result);
   return result;
 }
 

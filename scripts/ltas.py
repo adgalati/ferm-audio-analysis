@@ -73,6 +73,10 @@ def main():
     log_hr = np.log10(hr_freqs)
     hr_db = np.interp(log_hr, log_freqs, psd_db)
 
+    # Second smoothing pass (2/3 octave) on the interpolated curve for a
+    # cleaner visual display — band-level scoring data is unaffected.
+    hr_db = smooth(hr_db, hr_freqs, width_oct=2 / 3)
+
     # Anchor high-res to same mid-band reference
     hr_db_anchored = (hr_db - anchor).tolist()
     hr_freqs_list = hr_freqs.tolist()

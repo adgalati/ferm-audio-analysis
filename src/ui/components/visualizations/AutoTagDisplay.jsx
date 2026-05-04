@@ -8,7 +8,7 @@ import GenreWaveformOverlay from './GenreWaveformOverlay';
 /** Genre confidence gate — tracks below this threshold are categorized as "Other" */
 const GENRE_CONFIDENCE_THRESHOLD = 0.10;
 
-function AutoTagDisplay({ autotagging, audioFile }) {
+function AutoTagDisplay({ autotagging, audioFile, onGenreOverride }) {
   const [copied, setCopied] = useState(false);
   const [visualizationMode, setVisualizationMode] = useState('list');
   const [explainOpen, setExplainOpen] = useState(false);
@@ -77,6 +77,10 @@ function AutoTagDisplay({ autotagging, audioFile }) {
         setOverrideIndex(tagIndex);
         const tag = tags[tagIndex];
         const label = tag.subgenre ? `${tag.genre} - ${tag.subgenre}` : tag.genre;
+        // Notify session tracker of the new effective genre
+        if (onGenreOverride && audioFile?.name) {
+          onGenreOverride({ clipName: audioFile.name, genre: tag.genre, subgenre: tag.subgenre || null });
+        }
         setOverrideFeedback({
           type: 'success',
           message: `Official genre set to "${label}"`
@@ -109,6 +113,10 @@ function AutoTagDisplay({ autotagging, audioFile }) {
 
       if (result.success) {
         setOverrideIndex(null);
+        // Notify session tracker — revert to auto-detected top tag
+        if (onGenreOverride && audioFile?.name && tags?.[0]) {
+          onGenreOverride({ clipName: audioFile.name, genre: tags[0].genre, subgenre: tags[0].subgenre || null });
+        }
         setOverrideFeedback({
           type: 'success',
           message: `Reverted to auto-detected genre "${result.topGenre}"`

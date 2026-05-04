@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import FileUpload from './components/FileUpload';
 import AnalysisControls from './components/AnalysisControls';
 import ProgressPanel from './components/ProgressPanel';
@@ -11,6 +11,7 @@ import WatchStatusIndicator from './components/WatchStatusIndicator.jsx';
 import Settings from './components/Settings.jsx';
 import TrainingView from './components/TrainingView.jsx';
 import ReportGeneratorPanel from './components/ReportGeneratorPanel.jsx';
+import GenreSessionTracker from './components/GenreSessionTracker.jsx';
 import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
 import { getHistory, addHistoryItem } from './stores/analysisHistory.js';
 import { transformResultsToRecord, reconstructResultsFromRecord } from '../utils/mongodb-schema.js';
@@ -33,6 +34,12 @@ function App() {
   const [isMainstream, setIsMainstream] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Genre session tracker state
+  const [genreSessionActive, setGenreSessionActive] = useState(false);
+  const [genreSessionData, setGenreSessionData] = useState([]);
+  const genreSessionActiveRef = useRef(false);
+  const [overlayPoppedOut, setOverlayPoppedOut] = useState(false);
 
   const handleFileSelect = React.useCallback((file) => {
     console.log('[App] File selected:', file);
@@ -57,6 +64,16 @@ function App() {
     setIsAnalyzing(false);
     setProgress({ percent: 100, message: 'Analysis complete!' });
 
+    // Feed top genre tag into session tracker (if active)
+    if (genreSessionActiveRef.current && results?.autotagging?.tags?.length > 0) {
+      const topTag = results.autotagging.tags[0];
+      const clipName = fileInfo?.name || null;
+      setGenreSessionData(prev => [
+        ...prev,
+        { genre: topTag.genre, subgenre: topTag.subgenre || null, clipName }
+      ]);
+    }
+
     // Save to history with the file info passed in
     if (fileInfo) {
       const entry = addHistoryItem(fileInfo, results, { autoDetected: !!fileInfo.autoDetected });
@@ -68,6 +85,20 @@ function App() {
       // Queue for MongoDB cloud storage
       saveToMongoDB(fileInfo, results, options);
     }
+  }, []);
+
+  // Patch session entry when user overrides a genre in AutoTagDisplay
+  const handleGenreOverride = React.useCallback(({ clipName, genre, subgenre }) => {
+    if (!clipName) return;
+    setGenreSessionData(prev => {
+      // Find the last entry matching this clipName and update its genre/subgenre
+      const lastIdx = [...prev].reverse().findIndex(e => e.clipName === clipName);
+      if (lastIdx === -1) return prev; // not in session, nothing to patch
+      const realIdx = prev.length - 1 - lastIdx;
+      const updated = [...prev];
+      updated[realIdx] = { ...updated[realIdx], genre, subgenre: subgenre || null };
+      return updated;
+    });
   }, []);
 
   const saveToMongoDB = async (fileInfo, results, options = {}) => {
@@ -223,6 +254,32 @@ function App() {
     };
     fetchVersion();
   }, []);
+
+  // Sync genre session data to the overlay window when it changes
+  React.useEffect(() => {
+    if (overlayPoppedOut && genreSessionData) {
+      window.electronAPI?.updateOverlayData(genreSessionData);
+    }
+  }, [genreSessionData, overlayPoppedOut]);
+
+  // Listen for overlay window being closed (user closes it manually)
+  React.useEffect(() => {
+    const removeClosedListener = window.electronAPI?.onOverlayClosed?.(() => {
+      setOverlayPoppedOut(false);
+    });
+
+    // Handle overlay requesting initial data on mount
+    const removeRequestListener = window.electronAPI?.onOverlayRequestData?.(() => {
+      if (overlayPoppedOut) {
+        window.electronAPI?.updateOverlayData(genreSessionData);
+      }
+    });
+
+    return () => {
+      if (typeof removeClosedListener === 'function') removeClosedListener();
+      if (typeof removeRequestListener === 'function') removeRequestListener();
+    };
+  }, [overlayPoppedOut, genreSessionData]);
 
   // Auto-watch: when file detected, start analysis if idle
   React.useEffect(() => {
@@ -428,57 +485,102 @@ function App() {
             <div className="space-y-6">
               {activeMode === 'analysis' && (
                 <>
-                  {/* Awaiting file header and toggle */}
-                  <div className="bg-gray-800/60 backdrop-blur-md rounded-2xl p-6 border border-gray-600/50 shadow-[0_0_15px_rgba(56,189,248,0.15)] ring-1 ring-white/5 transition-all hover:border-cyan-500/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm text-gray-400">Awaiting file at</div>
-                        <div className="text-gray-200 text-sm truncate max-w-xl" title={watchPath || 'Not set'}>
-                          {watchPath || '—'}
-                        </div>
-                        {availability.length > 0 && (
-                          <div className="text-xs text-gray-500 mt-2">
-                            Checks complete: {availability.join(', ')}
+                  {/* Top bar row: Awaiting file + Genre Session Tracker */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-stretch">
+                    {/* Awaiting file header and toggle */}
+                    <div className="bg-gray-800/60 backdrop-blur-md rounded-2xl p-6 border border-gray-600/50 shadow-[0_0_15px_rgba(56,189,248,0.15)] ring-1 ring-white/5 transition-all hover:border-cyan-500/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm text-gray-400">Awaiting file at</div>
+                          <div className="text-gray-200 text-sm truncate max-w-xl" title={watchPath || 'Not set'}>
+                            {watchPath || '—'}
                           </div>
-                        )}
+                          {availability.length > 0 && (
+                            <div className="text-xs text-gray-500 mt-2">
+                              Checks complete: {availability.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => setShowHistory(true)}
+                            className="text-sm text-primary-400 hover:text-primary-300 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            History
+                          </button>
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <span className="text-sm text-gray-300">Select File</span>
+                            <input
+                              type="checkbox"
+                              checked={showFileSelector}
+                              onChange={() => setShowFileSelector(v => !v)}
+                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary-600 focus:ring-2 focus:ring-primary-500"
+                            />
+                          </label>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => setShowHistory(true)}
-                          className="text-sm text-primary-400 hover:text-primary-300 flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          History
-                        </button>
+                      <div className="mt-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
                         <label className="flex items-center gap-3 cursor-pointer">
-                          <span className="text-sm text-gray-300">Select File</span>
                           <input
                             type="checkbox"
-                            checked={showFileSelector}
-                            onChange={() => setShowFileSelector(v => !v)}
-                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary-600 focus:ring-2 focus:ring-primary-500"
+                            checked={isMainstream}
+                            onChange={() => setIsMainstream(!isMainstream)}
+                            disabled={isAnalyzing}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-amber-600 focus:ring-2 focus:ring-amber-500"
                           />
+                          <div>
+                            <span className="text-sm font-medium text-amber-300">Mainstream / Reference Track</span>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Mark the next analyzed track as mainstream/reference. Default is independent.
+                            </p>
+                          </div>
                         </label>
                       </div>
                     </div>
-                    <div className="mt-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isMainstream}
-                          onChange={() => setIsMainstream(!isMainstream)}
-                          disabled={isAnalyzing}
-                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-amber-600 focus:ring-2 focus:ring-amber-500"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-amber-300">Mainstream / Reference Track</span>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Mark the next analyzed track as mainstream/reference. Default is independent.
-                          </p>
+
+                    {/* Genre Session Tracker */}
+                    <div className="bg-gray-800/60 backdrop-blur-md rounded-2xl p-5 border border-gray-600/50 shadow-[0_0_15px_rgba(139,92,246,0.15)] ring-1 ring-white/5 transition-all hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(139,92,246,0.2)] flex items-center">
+                      {overlayPoppedOut ? (
+                        /* Compact indicator when popped out */
+                        <div className="flex flex-col items-center gap-2 px-2">
+                          <div className="text-xs font-semibold uppercase tracking-widest text-gray-400">Session Genres</div>
+                          <div className="text-xs text-purple-300 text-center">Popped out to overlay</div>
+                          <button
+                            onClick={async () => {
+                              await window.electronAPI?.closeOverlay();
+                              setOverlayPoppedOut(false);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-900/30 text-purple-300 border border-purple-500/40 hover:bg-purple-800/40 hover:text-purple-200 transition-all duration-200"
+                          >
+                            Return
+                          </button>
                         </div>
-                      </label>
+                      ) : (
+                        <GenreSessionTracker
+                          sessionData={genreSessionData}
+                          isActive={genreSessionActive}
+                          onToggle={() => {
+                            setGenreSessionActive(prev => {
+                              genreSessionActiveRef.current = !prev;
+                              return !prev;
+                            });
+                          }}
+                          onReset={() => {
+                            setGenreSessionData([]);
+                            setGenreSessionActive(false);
+                            genreSessionActiveRef.current = false;
+                          }}
+                          onPopout={async () => {
+                            const result = await window.electronAPI?.openOverlay(genreSessionData);
+                            if (result?.success) {
+                              setOverlayPoppedOut(true);
+                            }
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -543,7 +645,11 @@ function App() {
 
                   {/* Show results whenever available, even if Select File is off (e.g., from History) */}
                   {analysisResults && !isAnalyzing && (
-                    <ResultsView results={analysisResults} audioFile={selectedFile} />
+                    <ResultsView
+                      results={analysisResults}
+                      audioFile={selectedFile}
+                      onGenreOverride={handleGenreOverride}
+                    />
                   )}
                   {/* History Modal */}
                   {showHistory && (

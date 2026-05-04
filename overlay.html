@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/RealFERM_logo.png" />
+    <title>FERM Genre Pie Chart Overlay</title>
+    <style>
+      /* Transparent background for Streamlabs window capture */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+        user-select: none;
+        -webkit-app-region: drag;
+      }
+      #overlay-root {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay-root"></div>
+    <script type="module" src="/src/ui/overlay-main.jsx"></script>
+  </body>
+</html>

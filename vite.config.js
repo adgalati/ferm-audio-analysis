@@ -12,6 +12,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        overlay: path.resolve(__dirname, 'overlay.html'),
+      },
+    },
   },
   resolve: {
     alias: [

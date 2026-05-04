@@ -7,7 +7,7 @@ import React from 'react';
 export default function LoudnessTimeline({ timelineData, className = '' }) {
   if (!timelineData || timelineData.length === 0) {
     return (
-      <div className={`p-4 text-center text-gray-500 ${className}`}>
+      <div className={`p-4 text-center text-slate-400 ${className}`}>
         <p>No timeline data available</p>
         <p className="text-sm">Timeline analysis may have failed or is not enabled</p>
       </div>
@@ -59,7 +59,7 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
         y1={y}
         x2={padding + chartWidth}
         y2={y}
-        stroke="#e5e7eb"
+        stroke="rgba(148, 163, 184, 0.15)"
         strokeWidth="1"
         strokeDasharray="2,2"
       />
@@ -79,7 +79,8 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
         x={x}
         y={height - 10}
         textAnchor="middle"
-        className="text-xs fill-gray-600"
+        className="text-xs"
+        fill="#94a3b8"
       >
         {time.toFixed(1)}s
       </text>
@@ -94,10 +95,11 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
     valueLabels.push(
       <text
         key={`value-${i}`}
-        x={10}
+        x={35}
         y={y + 4}
         textAnchor="end"
-        className="text-xs fill-gray-600"
+        className="text-xs"
+        fill="#94a3b8"
       >
         {value.toFixed(1)}
       </text>
@@ -107,14 +109,14 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
   return (
     <div className={`${className}`}>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Loudness Timeline</h3>
-        <p className="text-sm text-gray-600">
+        <h3 className="text-lg font-semibold text-slate-100">Loudness Timeline</h3>
+        <p className="text-sm text-slate-400">
           Loudness variation over time ({timelineData.length} data points)
         </p>
       </div>
       
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <svg width={width} height={height} className="w-full h-auto">
+      <div className="bg-gray-900/70 rounded-xl border border-gray-800/60 p-4 shadow-inner">
+        <svg fill="none" viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
           {/* Grid lines */}
           {gridLines}
           
@@ -125,7 +127,7 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
             width={chartWidth}
             height={chartHeight}
             fill="none"
-            stroke="#d1d5db"
+            stroke="rgba(148, 163, 184, 0.3)"
             strokeWidth="1"
           />
           
@@ -133,9 +135,9 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
           <path
             d={pathData}
             fill="none"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            className="drop-shadow-sm"
+            stroke="#22d3ee"
+            strokeWidth="2.5"
+            className="drop-shadow-md"
           />
           
           {/* Data points */}
@@ -147,9 +149,8 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
                 key={index}
                 cx={x}
                 cy={y}
-                r="2"
-                fill="#3b82f6"
-                className="hover:r-3 transition-all duration-200"
+                r="1.5"
+                fill="#22d3ee"
               />
             );
           })}
@@ -163,7 +164,8 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
             x={width / 2}
             y={height - 5}
             textAnchor="middle"
-            className="text-sm font-medium fill-gray-700"
+            className="text-sm font-medium"
+            fill="#cbd5f5"
           >
             Time (seconds)
           </text>
@@ -172,19 +174,20 @@ export default function LoudnessTimeline({ timelineData, className = '' }) {
             y={height / 2}
             textAnchor="middle"
             transform={`rotate(-90, 15, ${height / 2})`}
-            className="text-sm font-medium fill-gray-700"
+            className="text-sm font-medium"
+            fill="#cbd5f5"
           >
             Loudness (LUFS)
           </text>
         </svg>
         
         {/* Legend */}
-        <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
+        <div className="mt-4 flex flex-col md:flex-row items-center justify-between text-sm text-slate-300">
           <div className="flex items-center space-x-2">
-            <div className="w-4 h-0.5 bg-blue-500"></div>
+            <div className="w-4 h-0.5 bg-cyan-400"></div>
             <span>Integrated Loudness</span>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-400 mt-2 md:mt-0">
             Range: {minValue.toFixed(1)} to {maxValue.toFixed(1)} LUFS
           </div>
         </div>

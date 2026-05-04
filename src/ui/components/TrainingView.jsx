@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Play, Save, RefreshCw, Database, Tag, LayoutList, Layers, Music } from 'lucide-react';
+import { Upload, Play, Save, RefreshCw, Database, Tag, LayoutList, Layers, Music, Heart, Bot } from 'lucide-react';
 import TrainingDatasetView from './TrainingDatasetView';
+import AffinityLabelingTab from './AffinityLabelingTab';
+import AiClassifierTab from './AiClassifierTab';
 
 const GENRES = [
     { id: 'hiphop', label: 'Hip-Hop' },
@@ -37,7 +39,10 @@ const LABELS = {
 };
 
 export default function TrainingView() {
-    const [activeTab, setActiveTab] = useState('labeling'); // 'labeling' or 'dataset'
+    // Top-level tab: 'substyle' | 'affinity' | 'ai_classifier'
+    const [activeTab, setActiveTab] = useState('substyle');
+    // Substyle inner tab: 'labeling' | 'dataset'
+    const [substyleInnerTab, setSubstyleInnerTab] = useState('labeling');
     const [activeGenre, setActiveGenre] = useState('hiphop');
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [selectedLabel, setSelectedLabel] = useState('');
@@ -48,7 +53,7 @@ export default function TrainingView() {
     const [lastAnalysis, setLastAnalysis] = useState(null);
 
     useEffect(() => {
-        fetchStats();
+        if (activeTab === 'substyle') fetchStats();
 
         const removeListener = window.electronAPI.onTrainingLog((log) => {
             setLogs(prev => [...prev.slice(-99), log.message]);
@@ -57,7 +62,7 @@ export default function TrainingView() {
         return () => {
             if (removeListener) removeListener();
         };
-    }, [activeGenre]); // Re-fetch when genre changes
+    }, [activeGenre, activeTab]); // Re-fetch when genre changes
 
     const fetchStats = async () => {
         try {
@@ -181,250 +186,283 @@ export default function TrainingView() {
         }
     };
 
+    const tabStyle = (id) => `px-4 py-2 rounded-t-lg flex items-center gap-2 transition-colors ${
+        activeTab === id
+            ? 'bg-gray-800 text-cyan-300 border-b-2 border-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.3)]'
+            : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+    }`;
+
     return (
         <div className="space-y-6">
-            {/* Genre Selection Tabs */}
-            <div className="flex gap-2 border-b border-gray-700 pb-2 overflow-x-auto">
-                {GENRES.map(genre => (
-                    <button
-                        key={genre.id}
-                        onClick={() => setActiveGenre(genre.id)}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${activeGenre === genre.id
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/50'
-                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-                            }`}
-                    >
-                        <Music className="w-4 h-4" />
-                        {genre.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Mode Navigation */}
+            {/* Top-level sub-tabs */}
             <div className="flex gap-4 border-b border-gray-700 pb-2">
-                <button
-                    onClick={() => setActiveTab('labeling')}
-                    className={`px-4 py-2 rounded-t-lg flex items-center gap-2 transition-colors ${activeTab === 'labeling'
-                        ? 'bg-gray-800 text-primary-400 border-b-2 border-primary-500'
-                        : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                        }`}
-                >
+                <button onClick={() => setActiveTab('substyle')} className={tabStyle('substyle')}>
                     <Tag className="w-4 h-4" />
-                    Labeling & Training
+                    Substyle Classifier
                 </button>
-                <button
-                    onClick={() => setActiveTab('dataset')}
-                    className={`px-4 py-2 rounded-t-lg flex items-center gap-2 transition-colors ${activeTab === 'dataset'
-                        ? 'bg-gray-800 text-primary-400 border-b-2 border-primary-500'
-                        : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                        }`}
-                >
-                    <Database className="w-4 h-4" />
-                    Dataset View
+                <button onClick={() => setActiveTab('affinity')} className={tabStyle('affinity')}>
+                    <Heart className="w-4 h-4" />
+                    Affinity Labeling
+                </button>
+                <button onClick={() => setActiveTab('ai_classifier')} className={tabStyle('ai_classifier')}>
+                    <Bot className="w-4 h-4" />
+                    AI Classifier
                 </button>
             </div>
 
-            {activeTab === 'dataset' ? (
-                <TrainingDatasetView genre={activeGenre} />
-            ) : (
-                <>
-                    {/* Labeling Panel */}
-                    <div className="card p-6 bg-gray-800 rounded-lg border border-gray-700">
-                        <h2 className="text-xl font-bold text-primary-400 mb-4 flex items-center gap-2">
-                            <Tag className="w-5 h-5" />
-                            Label Track ({GENRES.find(g => g.id === activeGenre)?.label})
-                        </h2>
-
-                        <div className="space-y-4">
-                            {/* File Selection */}
-                            <div className="flex gap-4 items-end">
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Audio Files</label>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-300 overflow-hidden text-ellipsis whitespace-nowrap flex items-center">
-                                            {selectedFiles.length === 0
-                                                ? <span className="text-gray-500">Select tracks...</span>
-                                                : selectedFiles.length === 1
-                                                    ? selectedFiles[0].path
-                                                    : `${selectedFiles.length} files selected`
-                                            }
-                                        </div>
-                                        <button
-                                            onClick={handleFileSelect}
-                                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center gap-2"
-                                        >
-                                            <Upload className="w-4 h-4" />
-                                            Select
-                                        </button>
-                                    </div>
-                                    {selectedFiles.length > 1 && (
-                                        <div className="mt-2 max-h-32 overflow-y-auto bg-gray-900/50 rounded p-2 text-xs text-gray-400 border border-gray-800 custom-scrollbar">
-                                            {selectedFiles.map((f, i) => (
-                                                <div key={i} className="truncate py-0.5 border-b border-gray-800/50 last:border-0">
-                                                    {f.name}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Track ID */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Track ID</label>
-                                <input
-                                    type="text"
-                                    value={trackId}
-                                    readOnly
-                                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-500 cursor-not-allowed"
-                                    placeholder="Auto-generated ID"
-                                />
-                            </div>
-
-                            {/* Label Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Genre Label</label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                    {LABELS[activeGenre].map((l) => (
-                                        <button
-                                            key={l.id}
-                                            onClick={() => setSelectedLabel(l.id)}
-                                            className={`px-3 py-2 rounded text-sm text-left transition-colors ${selectedLabel === l.id
-                                                ? 'bg-primary-600 text-white ring-2 ring-primary-400'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                        >
-                                            {l.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Save Button */}
-                            <div className="pt-2">
-                                <button
-                                    onClick={handleSaveLabel}
-                                    disabled={selectedFiles.length === 0 || !selectedLabel}
-                                    className="px-6 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-medium flex items-center gap-2"
-                                >
-                                    <Save className="w-4 h-4" />
-                                    Save Label
-                                </button>
-                            </div>
-                        </div>
+            {/* ==================== SUBSTYLE CLASSIFIER ==================== */}
+            {activeTab === 'substyle' && (
+                <div className="space-y-5">
+                    {/* Genre Selection Buttons */}
+                    <div className="flex gap-2 overflow-x-auto">
+                        {GENRES.map(genre => (
+                            <button
+                                key={genre.id}
+                                onClick={() => setActiveGenre(genre.id)}
+                                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${activeGenre === genre.id
+                                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/50'
+                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                                    }`}
+                            >
+                                <Music className="w-4 h-4" />
+                                {genre.label}
+                            </button>
+                        ))}
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Dataset Status Panel */}
-                        <div className="card p-6 bg-gray-800 rounded-lg border border-gray-700">
-                            <h2 className="text-xl font-bold text-primary-400 mb-4 flex items-center gap-2">
-                                <Database className="w-5 h-5" />
-                                Dataset Status
-                            </h2>
+                    {/* Inner tabs: Labeling & Training | Dataset View */}
+                    <div className="flex gap-3 border-b border-gray-700/50 pb-1">
+                        <button
+                            onClick={() => setSubstyleInnerTab('labeling')}
+                            className={`px-3 py-1.5 text-sm rounded-t flex items-center gap-1.5 transition-colors ${substyleInnerTab === 'labeling'
+                                ? 'bg-gray-800 text-primary-400 border-b-2 border-primary-500'
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'
+                                }`}
+                        >
+                            <Tag className="w-3.5 h-3.5" />
+                            Labeling & Training
+                        </button>
+                        <button
+                            onClick={() => setSubstyleInnerTab('dataset')}
+                            className={`px-3 py-1.5 text-sm rounded-t flex items-center gap-1.5 transition-colors ${substyleInnerTab === 'dataset'
+                                ? 'bg-gray-800 text-primary-400 border-b-2 border-primary-500'
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'
+                                }`}
+                        >
+                            <Database className="w-3.5 h-3.5" />
+                            Dataset View
+                        </button>
+                    </div>
 
-                            <div className="space-y-4">
-                                <div className="text-3xl font-bold text-white">
-                                    {stats.total} <span className="text-lg text-gray-400 font-normal">labeled tracks</span>
-                                </div>
+                    {substyleInnerTab === 'dataset' ? (
+                        <TrainingDatasetView genre={activeGenre} />
+                    ) : (
+                        <>
+                            {/* Labeling Panel */}
+                            <div className="card p-6 bg-gray-800 rounded-lg border border-gray-700">
+                                <h2 className="text-xl font-bold text-primary-400 mb-4 flex items-center gap-2">
+                                    <Tag className="w-5 h-5" />
+                                    Label Track ({GENRES.find(g => g.id === activeGenre)?.label})
+                                </h2>
 
-                                <div className="space-y-2">
-                                    {LABELS[activeGenre].map(l => {
-                                        const count = stats.perLabel[l.id] || 0;
-                                        const percent = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                                        return (
-                                            <div key={l.id} className="space-y-1">
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-300">{l.label}</span>
-                                                    <span className="text-gray-400">{count}</span>
+                                <div className="space-y-4">
+                                    {/* File Selection */}
+                                    <div className="flex gap-4 items-end">
+                                        <div className="flex-1">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Audio Files</label>
+                                            <div className="flex gap-2">
+                                                <div className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-300 overflow-hidden text-ellipsis whitespace-nowrap flex items-center">
+                                                    {selectedFiles.length === 0
+                                                        ? <span className="text-gray-500">Select tracks...</span>
+                                                        : selectedFiles.length === 1
+                                                            ? selectedFiles[0].path
+                                                            : `${selectedFiles.length} files selected`
+                                                    }
                                                 </div>
-                                                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-primary-500 transition-all duration-500"
-                                                        style={{ width: `${percent}%` }}
-                                                    />
-                                                </div>
+                                                <button
+                                                    onClick={handleFileSelect}
+                                                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center gap-2"
+                                                >
+                                                    <Upload className="w-4 h-4" />
+                                                    Select
+                                                </button>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Actions Panel (Embeddings & Training) */}
-                        <div className="card p-6 bg-gray-800 rounded-lg border border-gray-700">
-                            <h2 className="text-xl font-bold text-primary-400 mb-4 flex items-center gap-2">
-                                <RefreshCw className={`w-5 h-5 ${isBuilding ? 'animate-spin' : ''}`} />
-                                Actions
-                            </h2>
-
-                            <div className="space-y-6">
-                                {/* Generate Embeddings */}
-                                <div className="space-y-2">
-                                    <h3 className="text-sm font-medium text-gray-300">1. Generate Embeddings</h3>
-                                    <p className="text-xs text-gray-400">
-                                        Extract embeddings for any new labeled tracks. This runs locally and saves .npy files.
-                                    </p>
-                                    <button
-                                        onClick={handleBuildEmbeddings}
-                                        disabled={isBuilding}
-                                        className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded flex items-center justify-center gap-2"
-                                    >
-                                        {isBuilding ? 'Building...' : 'Generate Embeddings'}
-                                    </button>
-                                </div>
-
-                                {/* Last Analysis Result */}
-                                {lastAnalysis && (
-                                    <div className="bg-gray-900/50 p-4 rounded border border-gray-700 animate-in fade-in slide-in-from-top-2">
-                                        <h4 className="text-sm font-bold text-primary-300 mb-2 flex items-center gap-2">
-                                            <Layers className="w-4 h-4" />
-                                            Last Analysis Results
-                                        </h4>
-                                        <div className="text-xs text-gray-400 mb-2 truncate" title={lastAnalysis.audio_path}>
-                                            {lastAnalysis.audio_path.split(/[\\/]/).pop()}
-                                        </div>
-                                        <div className="space-y-1">
-                                            {lastAnalysis.results.slice(0, 7).map((tag, i) => (
-                                                <div key={i} className="flex justify-between text-xs">
-                                                    <span className="text-gray-300">{tag.genre} {tag.subgenre ? `- ${tag.subgenre}` : ''}</span>
-                                                    <span className="text-gray-500 font-mono">{(tag.score * 100).toFixed(0)}%</span>
+                                            {selectedFiles.length > 1 && (
+                                                <div className="mt-2 max-h-32 overflow-y-auto bg-gray-900/50 rounded p-2 text-xs text-gray-400 border border-gray-800 custom-scrollbar">
+                                                    {selectedFiles.map((f, i) => (
+                                                        <div key={i} className="truncate py-0.5 border-b border-gray-800/50 last:border-0">
+                                                            {f.name}
+                                                        </div>
+                                                    ))}
                                                 </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Track ID */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-400 mb-1">Track ID</label>
+                                        <input
+                                            type="text"
+                                            value={trackId}
+                                            readOnly
+                                            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-500 cursor-not-allowed"
+                                            placeholder="Auto-generated ID"
+                                        />
+                                    </div>
+
+                                    {/* Label Selection */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-400 mb-1">Genre Label</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                            {LABELS[activeGenre].map((l) => (
+                                                <button
+                                                    key={l.id}
+                                                    onClick={() => setSelectedLabel(l.id)}
+                                                    className={`px-3 py-2 rounded text-sm text-left transition-colors ${selectedLabel === l.id
+                                                        ? 'bg-primary-600 text-white ring-2 ring-primary-400'
+                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                        }`}
+                                                >
+                                                    {l.label}
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
-                                )}
 
-                                {/* Train Classifier */}
-                                <div className="space-y-2 border-t border-gray-700 pt-4">
-                                    <h3 className="text-sm font-medium text-gray-300">2. Train Classifier</h3>
-                                    <p className="text-xs text-gray-400">
-                                        Train a new classifier model using the generated embeddings.
-                                    </p>
-                                    <button
-                                        onClick={handleTrainClassifier}
-                                        className="w-full px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded flex items-center justify-center gap-2"
-                                    >
-                                        Train Classifier
-                                    </button>
-                                </div>
-
-                                {/* Logs */}
-                                <div className="mt-4 bg-gray-900 rounded p-3 h-48 overflow-y-auto font-mono text-xs text-gray-400">
-                                    {logs.length === 0 ? (
-                                        <span className="italic opacity-50">Ready...</span>
-                                    ) : (
-                                        logs.map((log, i) => (
-                                            <div key={i} className="whitespace-pre-wrap border-b border-gray-800 pb-1 mb-1 last:border-0">
-                                                {log}
-                                            </div>
-                                        ))
-                                    )}
+                                    {/* Save Button */}
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={handleSaveLabel}
+                                            disabled={selectedFiles.length === 0 || !selectedLabel}
+                                            className="px-6 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-medium flex items-center gap-2"
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            Save Label
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Dataset Status Panel */}
+                                <div className="card p-6 bg-gray-800 rounded-lg border border-gray-700">
+                                    <h2 className="text-xl font-bold text-primary-400 mb-4 flex items-center gap-2">
+                                        <Database className="w-5 h-5" />
+                                        Dataset Status
+                                    </h2>
+
+                                    <div className="space-y-4">
+                                        <div className="text-3xl font-bold text-white">
+                                            {stats.total} <span className="text-lg text-gray-400 font-normal">labeled tracks</span>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {LABELS[activeGenre].map(l => {
+                                                const count = stats.perLabel[l.id] || 0;
+                                                const percent = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                                                return (
+                                                    <div key={l.id} className="space-y-1">
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-gray-300">{l.label}</span>
+                                                            <span className="text-gray-400">{count}</span>
+                                                        </div>
+                                                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-primary-500 transition-all duration-500"
+                                                                style={{ width: `${percent}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Actions Panel (Embeddings & Training) */}
+                                <div className="card p-6 bg-gray-800 rounded-lg border border-gray-700">
+                                    <h2 className="text-xl font-bold text-primary-400 mb-4 flex items-center gap-2">
+                                        <RefreshCw className={`w-5 h-5 ${isBuilding ? 'animate-spin' : ''}`} />
+                                        Actions
+                                    </h2>
+
+                                    <div className="space-y-6">
+                                        {/* Generate Embeddings */}
+                                        <div className="space-y-2">
+                                            <h3 className="text-sm font-medium text-gray-300">1. Generate Embeddings</h3>
+                                            <p className="text-xs text-gray-400">
+                                                Extract embeddings for any new labeled tracks. This runs locally and saves .npy files.
+                                            </p>
+                                            <button
+                                                onClick={handleBuildEmbeddings}
+                                                disabled={isBuilding}
+                                                className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded flex items-center justify-center gap-2"
+                                            >
+                                                {isBuilding ? 'Building...' : 'Generate Embeddings'}
+                                            </button>
+                                        </div>
+
+                                        {/* Last Analysis Result */}
+                                        {lastAnalysis && (
+                                            <div className="bg-gray-900/50 p-4 rounded border border-gray-700 animate-in fade-in slide-in-from-top-2">
+                                                <h4 className="text-sm font-bold text-primary-300 mb-2 flex items-center gap-2">
+                                                    <Layers className="w-4 h-4" />
+                                                    Last Analysis Results
+                                                </h4>
+                                                <div className="text-xs text-gray-400 mb-2 truncate" title={lastAnalysis.audio_path}>
+                                                    {lastAnalysis.audio_path.split(/[\\/]/).pop()}
+                                                </div>
+                                                <div className="space-y-1">
+                                                    {lastAnalysis.results.slice(0, 7).map((tag, i) => (
+                                                        <div key={i} className="flex justify-between text-xs">
+                                                            <span className="text-gray-300">{tag.genre} {tag.subgenre ? `- ${tag.subgenre}` : ''}</span>
+                                                            <span className="text-gray-500 font-mono">{(tag.score * 100).toFixed(0)}%</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Train Classifier */}
+                                        <div className="space-y-2 border-t border-gray-700 pt-4">
+                                            <h3 className="text-sm font-medium text-gray-300">2. Train Classifier</h3>
+                                            <p className="text-xs text-gray-400">
+                                                Train a new classifier model using the generated embeddings.
+                                            </p>
+                                            <button
+                                                onClick={handleTrainClassifier}
+                                                className="w-full px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded flex items-center justify-center gap-2"
+                                            >
+                                                Train Classifier
+                                            </button>
+                                        </div>
+
+                                        {/* Logs */}
+                                        <div className="mt-4 bg-gray-900 rounded p-3 h-48 overflow-y-auto font-mono text-xs text-gray-400">
+                                            {logs.length === 0 ? (
+                                                <span className="italic opacity-50">Ready...</span>
+                                            ) : (
+                                                logs.map((log, i) => (
+                                                    <div key={i} className="whitespace-pre-wrap border-b border-gray-800 pb-1 mb-1 last:border-0">
+                                                        {log}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
             )}
+
+            {/* ==================== AFFINITY LABELING ==================== */}
+            {activeTab === 'affinity' && <AffinityLabelingTab />}
+
+            {/* ==================== AI CLASSIFIER ==================== */}
+            {activeTab === 'ai_classifier' && <AiClassifierTab />}
         </div>
     );
 }

@@ -333,5 +333,7 @@ export const COLLECTION_INDEXES = [
   { key: { isFavorite: 1 } },
   { key: { timePeriod: 1 } },
   { key: { periodStart: -1 } },
-  { key: { sourceType: 1 } }
+  { key: { sourceType: 1 } },
+  { key: { affinityLabel: 1 } },       // For affinity training label filtering
+  { key: { aiGeneratedLabel: 1 } }     // For AI-detection training label filtering
 ];
